@@ -37,8 +37,7 @@ function renderPaper(paperId){
       '</div>';
 
     if (t.scholars && t.scholars.length){
-      html += '<div class="scholar-list">' +
-        '<div class="scholar-list-label">Scholar bank</div>';
+      html += '<div class="scholar-list"><div class="scholar-list-label">Scholar bank</div>';
       t.scholars.forEach(function(s){
         html += '<div class="scholar-item"><span class="scholar-name">' + s.name + '</span><span>' + s.pos + '</span></div>';
       });
@@ -89,7 +88,6 @@ function setupScrollSpy(){
   items.forEach(function(t){ obs.observe(t); });
 }
 
-/* Paper tabs */
 document.querySelectorAll('.paper-tab').forEach(function(tab){
   tab.addEventListener('click', function(){
     document.querySelectorAll('.paper-tab').forEach(function(t){ t.setAttribute('aria-selected', 'false'); });
@@ -98,7 +96,6 @@ document.querySelectorAll('.paper-tab').forEach(function(tab){
   });
 });
 
-/* Search */
 let searchIndex = [];
 let searchResults = [];
 let searchSelectedIdx = 0;
@@ -109,9 +106,7 @@ function buildSearchIndex(){
     (CONTENT[p].topics || []).forEach(function(t, i){
       const scholarText = (t.scholars || []).map(function(s){ return s.name + ' ' + s.pos; }).join(' ');
       searchIndex.push({
-        paper: p,
-        topicId: t.id,
-        num: i + 1,
+        paper: p, topicId: t.id, num: i + 1,
         title: stripHtml(t.title),
         body: [stripHtml(t.title), t.spec.join(' '), t.orientation, stripHtml(t.ao1), stripHtml(t.ao2), stripHtml(t.thesis.line), stripHtml(t.thesis.unpacking), t.quote.text + ' ' + t.quote.cite, t.exam, scholarText].join(' ').toLowerCase(),
         snippet: t.orientation
@@ -159,7 +154,7 @@ function renderSearchResults(q){
   searchSelectedIdx = 0;
   const el = document.getElementById('search-results');
   if (!q || q.length < 2){
-    el.innerHTML = '<div class="search-empty">Type at least 2 characters to search.</div>';
+    el.innerHTML = '<div class="search-empty">Type at least 2 characters.</div>';
     return;
   }
   if (!searchResults.length){
