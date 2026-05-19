@@ -124,6 +124,73 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .toast{background:var(--ink);color:var(--paper);padding:0.55rem 1rem;font-family:var(--ui);font-size:0.78rem;font-weight:500;border-radius:2px;border-left:3px solid var(--gold);box-shadow:0 6px 20px -4px rgba(0,0,0,0.4)}
 .toast.success{border-left-color:var(--green)}
 
+/* Filter / tools bar */
+.toc-tools{margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--rule)}
+.toc-tools-label{font-family:var(--ui);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:0.4rem}
+.filter-pills{display:flex;flex-wrap:wrap;gap:0.2rem;margin-bottom:0.7rem}
+.filter-pill{padding:0.25rem 0.5rem;font-family:var(--ui);font-size:0.62rem;font-weight:500;background:var(--wash);border:1px solid var(--rule);color:var(--ink);cursor:pointer;border-radius:2px;letter-spacing:0.02em}
+.filter-pill:hover{border-color:var(--claret)}
+.filter-pill.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tool-btn{display:block;width:100%;padding:0.4rem 0.55rem;font-family:var(--ui);font-size:0.66rem;font-weight:500;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);cursor:pointer;border-radius:2px;margin-top:0.3rem;letter-spacing:0.02em;text-align:left}
+.tool-btn:hover{border-color:var(--claret);background:var(--paper-deep);color:var(--claret)}
+.tool-btn .ti{font-family:var(--display);font-style:italic;color:var(--claret);margin-right:0.3rem;font-weight:600}
+
+/* Topic filtering via body classes */
+body.filter-studied .topic:not(.is-studied),
+body.filter-bookmarked .topic:not(.is-bookmarked),
+body.filter-unstudied .topic.is-studied{display:none}
+body.filter-studied .toc a:not(.is-studied),
+body.filter-bookmarked .toc a:not(.is-bookmarked),
+body.filter-unstudied .toc a.is-studied{display:none}
+
+/* Topic notes */
+.topic-notes{margin-top:1rem;background:var(--paper);border:1px dashed var(--rule-strong);padding:0.85rem 1rem}
+.topic-notes-label{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:baseline}
+.topic-notes-saved{font-family:var(--ui);font-size:0.6rem;color:var(--green);font-style:italic;letter-spacing:0;text-transform:none;font-weight:500}
+.topic-notes textarea{width:100%;min-height:80px;padding:0.55rem 0.7rem;font-family:var(--display);font-style:italic;font-size:0.96rem;line-height:1.5;background:var(--wash);border:1px solid var(--rule);color:var(--ink);outline:none;resize:vertical}
+.topic-notes textarea:focus{border-color:var(--ochre)}
+
+/* Synoptic suggestions */
+.synoptic-suggest{margin-top:1.2rem;padding:0.85rem 1rem;background:rgba(168,125,44,0.05);border:1px dashed var(--ochre)}
+.synoptic-suggest-label{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.5rem}
+.synoptic-list{display:flex;flex-direction:column;gap:0.3rem}
+.synoptic-card{display:flex;justify-content:space-between;gap:0.7rem;padding:0.4rem 0.6rem;background:var(--wash);border:1px solid var(--rule);cursor:pointer;text-decoration:none;color:var(--ink);font-size:0.85rem;line-height:1.3;transition:all 0.15s}
+.synoptic-card:hover{border-color:var(--ochre);background:var(--paper-deep)}
+.synoptic-card-title{font-family:var(--display);font-style:italic;color:var(--ink);flex:1}
+.synoptic-card-meta{font-family:var(--mono);font-size:0.65rem;color:var(--ochre);flex-shrink:0;align-self:center}
+
+/* Flashcard modal */
+.flash-card{padding:2rem 1.5rem;text-align:center;font-family:var(--display);font-style:italic;color:var(--ink)}
+.flash-q{font-size:1.4rem;line-height:1.4;font-weight:500;max-width:50ch;margin:1.5rem auto}
+.flash-prompt{font-family:var(--ui);font-style:normal;font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem}
+.flash-source{margin-top:1.2rem;padding-top:1rem;border-top:1px dashed var(--rule);display:none}
+.flash-source.revealed{display:block}
+.flash-source .src-cite{font-family:var(--display);font-style:italic;font-size:1.15rem;font-weight:600;color:var(--claret)}
+.flash-source .src-topic{font-family:var(--ui);font-style:normal;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-top:0.3rem}
+.flash-controls{display:flex;justify-content:center;gap:0.5rem;padding:0 1.5rem 1.5rem;flex-wrap:wrap}
+.flash-controls button{padding:0.5rem 1rem;font-family:var(--ui);font-size:0.74rem;font-weight:600;letter-spacing:0.04em;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink);cursor:pointer;border-radius:2px}
+.flash-controls button:hover{border-color:var(--claret);background:var(--paper-deep)}
+.flash-controls .primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.flash-controls .primary:hover{background:var(--claret);border-color:var(--claret)}
+.flash-counter{font-family:var(--mono);font-size:0.7rem;color:var(--muted);text-align:center;padding:0.5rem;background:var(--wash);border-top:1px solid var(--rule)}
+
+/* Essay generator */
+.essay-gen-body{padding:1.5rem 1.5rem 1rem;color:var(--ink)}
+.essay-gen-stem{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.5rem}
+.essay-gen-q{font-family:var(--display);font-style:italic;font-size:1.3rem;line-height:1.4;color:var(--ink);font-weight:500;padding:1rem 1.2rem;background:var(--paper-deep);border-left:4px solid var(--claret);margin-bottom:1rem}
+.essay-gen-meta{font-family:var(--mono);font-size:0.7rem;color:var(--muted);margin-bottom:1rem}
+.essay-gen-thesis{font-family:var(--body);font-size:0.92rem;line-height:1.6;padding:0.8rem 1rem;background:var(--wash);border-left:3px solid var(--gold);margin-bottom:1rem}
+.essay-gen-thesis strong{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);font-weight:700;display:block;margin-bottom:0.3rem}
+.essay-gen-controls{display:flex;gap:0.5rem;padding:0 1.5rem 1.5rem;flex-wrap:wrap}
+.essay-gen-controls button{padding:0.5rem 1rem;font-family:var(--ui);font-size:0.74rem;font-weight:600;letter-spacing:0.04em;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink);cursor:pointer;border-radius:2px;flex:1}
+.essay-gen-controls .primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* Print modes */
+@media print{
+  body.print-studied .topic:not(.is-studied){display:none!important}
+  body.print-bookmarked .topic:not(.is-bookmarked){display:none!important}
+}
+
 .orientation{font-family:var(--display);font-style:italic;font-size:1.1rem;line-height:1.5;color:var(--ink);max-width:64ch;border-left:3px solid var(--claret);padding:0.2rem 0 0.2rem 1rem;margin:0.3rem 0 1.3rem 0.3rem}
 
 .ao-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.1rem}
@@ -361,6 +428,20 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
       <div class="toc-progress-bar"><div class="toc-progress-fill" id="prog-fill" style="width:0%"></div></div>
       <button class="toc-progress-reset" id="prog-reset">Reset this paper</button>
     </div>
+    <div class="toc-tools" id="toc-tools" style="display:none">
+      <div class="toc-tools-label">Filter</div>
+      <div class="filter-pills">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="studied">Studied</button>
+        <button class="filter-pill" data-filter="bookmarked">★ Bookmarked</button>
+        <button class="filter-pill" data-filter="unstudied">Unstudied</button>
+      </div>
+      <div class="toc-tools-label">Revision tools</div>
+      <button class="tool-btn" id="tool-random"><span class="ti">⚂</span> Random topic</button>
+      <button class="tool-btn" id="tool-flashcards"><span class="ti">♦</span> Quote flashcards</button>
+      <button class="tool-btn" id="tool-essay-gen"><span class="ti">✎</span> Essay question generator</button>
+      <button class="tool-btn" id="tool-print"><span class="ti">⎙</span> Print only studied / bookmarked…</button>
+    </div>
   </aside>
   <main class="main" id="main"><div class="app-loading">Loading revision content&hellip;</div></main>
 </div>
@@ -373,6 +454,37 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
       <button class="search-close" id="search-close">ESC</button>
     </div>
     <div class="search-results" id="search-results"></div>
+  </div>
+</div>
+
+<div class="search-modal" id="flash-modal" role="dialog" aria-label="Quote flashcards">
+  <div class="search-box">
+    <div class="search-input-wrap">
+      <span class="search-icon">♦</span>
+      <div style="flex:1"><div style="font-family:var(--display);font-size:1.2rem;font-weight:600;font-style:italic;color:var(--claret)">Quote flashcards</div><div style="font-family:var(--ui);font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-top:0.15rem">Who said this? Click to reveal.</div></div>
+      <button class="search-close" id="flash-close">ESC</button>
+    </div>
+    <div id="flash-body" class="flash-card"></div>
+    <div class="flash-controls">
+      <button id="flash-reveal" class="primary">Reveal</button>
+      <button id="flash-next">Next →</button>
+    </div>
+    <div class="flash-counter" id="flash-counter"></div>
+  </div>
+</div>
+
+<div class="search-modal" id="essay-modal" role="dialog" aria-label="Essay generator">
+  <div class="search-box">
+    <div class="search-input-wrap">
+      <span class="search-icon">✎</span>
+      <div style="flex:1"><div style="font-family:var(--display);font-size:1.2rem;font-weight:600;font-style:italic;color:var(--claret)">Essay question generator</div><div style="font-family:var(--ui);font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-top:0.15rem">Random exam prompt for timed practice</div></div>
+      <button class="search-close" id="essay-close">ESC</button>
+    </div>
+    <div id="essay-body" class="essay-gen-body"></div>
+    <div class="essay-gen-controls">
+      <button id="essay-new" class="primary">New question</button>
+      <button id="essay-jump">Jump to topic</button>
+    </div>
   </div>
 </div>
 

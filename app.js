@@ -2,7 +2,7 @@
 
 /* PROGRESS STATE (localStorage) */
 const STORAGE_KEY = 'h573_progress_v1';
-const DEFAULT_STATE = { studied: {}, bookmarks: {}, hiddenThesis: false };
+const DEFAULT_STATE = { studied: {}, bookmarks: {}, hiddenThesis: false, notes: {}, filter: 'all' };
 let STATE = JSON.parse(JSON.stringify(DEFAULT_STATE));
 try {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -11,6 +11,8 @@ try {
     STATE = Object.assign({}, DEFAULT_STATE, parsed);
     STATE.studied = STATE.studied || {};
     STATE.bookmarks = STATE.bookmarks || {};
+    STATE.notes = STATE.notes || {};
+    STATE.filter = STATE.filter || 'all';
   }
 } catch(e){}
 function saveState(){
@@ -104,7 +106,8 @@ function renderTopicPaper(paperId, paper){
     const isStudied = !!STATE.studied[tkey];
     const isBookmarked = !!STATE.bookmarks[tkey];
     const hiddenCls = STATE.hiddenThesis ? ' hidden' : '';
-    html += '<article class="topic" id="' + t.id + '">' +
+    const stateCls = (isStudied ? ' is-studied' : '') + (isBookmarked ? ' is-bookmarked' : '');
+    html += '<article class="topic' + stateCls + '" id="' + t.id + '">' +
       '<header class="topic-header"><div class="topic-num">&sect; ' + num + '</div>' +
       '<div class="topic-title-block"><h2>' + t.title + '</h2>' +
       '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div></div>' +
@@ -134,27 +137,126 @@ function renderTopicPaper(paperId, paper){
       html += '</div>';
     }
     html += '<div class="extras"><blockquote class="quote">&ldquo;' + t.quote.text + '&rdquo;<cite>' + t.quote.cite + '</cite></blockquote>' +
-      '<div class="exam-prompt">' + t.exam + '</div></div></article>';
+      '<div class="exam-prompt">' + t.exam + '</div></div>';
+
+    /* Synoptic suggestions: shared-scholar overlap with other topics */
+    const suggestions = computeSynopticSuggestions(paperId, t);
+    if (suggestions.length){
+      html += '<div class="synoptic-suggest"><div class="synoptic-suggest-label">Synoptic links &middot; topics that share scholars with this one</div><div class="synoptic-list">';
+      suggestions.forEach(function(s){
+        html += '<a class="synoptic-card" href="#" data-jump-paper="' + s.paper + '" data-jump-topic="' + s.topicId + '"><span class="synoptic-card-title">' + s.title + '</span><span class="synoptic-card-meta">P' + s.paper + ' &middot; ' + s.shared + ' shared</span></a>';
+      });
+      html += '</div></div>';
+    }
+
+    /* Per-topic notes */
+    const noteVal = (STATE.notes[tkey] || '').replace(/</g, '&lt;');
+    html += '<div class="topic-notes"><div class="topic-notes-label"><span>Your notes</span><span class="topic-notes-saved" id="ns-' + tkey.replace(/:/g, '_') + '"></span></div>' +
+      '<textarea data-notes-key="' + tkey + '" placeholder="Add your own notes, mnemonics, examples — saved automatically.">' + noteVal + '</textarea></div>';
+
+    html += '</article>';
   });
   html += '</section>';
   main.innerHTML = html;
   toc.innerHTML = paper.topics.map(function(t){
     const tk = topicKey(paperId, t.id);
+    const cls = (STATE.studied[tk] ? 'is-studied ' : '') + (STATE.bookmarks[tk] ? 'is-bookmarked' : '');
     const pip = STATE.studied[tk] ? '<span class="toc-pip studied"></span>' : (STATE.bookmarks[tk] ? '<span class="toc-pip bookmarked"></span>' : '');
-    return '<li><a href="#' + t.id + '">' + stripHtml(t.title) + pip + '</a></li>';
+    return '<li><a class="' + cls.trim() + '" href="#' + t.id + '">' + stripHtml(t.title) + pip + '</a></li>';
   }).join('');
   updateProgressBar(paperId);
+  applyFilter();
   setupScrollSpy('.topic');
   wireTopicActions(paperId);
+  wireSynopticJumps();
+  wireNotes();
   wireScholarClicks();
   window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/* Compute topics that share scholars with the given topic.
+   Sorted by shared count, top 5, excluding the topic itself. */
+function computeSynopticSuggestions(paperId, topic){
+  if (!topic.scholars || !topic.scholars.length) return [];
+  const sourceKeys = {};
+  topic.scholars.forEach(function(s){ sourceKeys[canonicalScholarKey(s.name)] = true; });
+  const results = [];
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){
+      if (p === paperId && t.id === topic.id) return;
+      let shared = 0;
+      (t.scholars || []).forEach(function(s){
+        if (sourceKeys[canonicalScholarKey(s.name)]) shared++;
+      });
+      if (shared >= 2) results.push({ paper: p, topicId: t.id, title: stripHtml(t.title), shared: shared });
+    });
+  });
+  results.sort(function(a, b){ return b.shared - a.shared; });
+  return results.slice(0, 5);
+}
+
+function wireSynopticJumps(){
+  document.querySelectorAll('.synoptic-card[data-jump-topic]').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.preventDefault();
+      const targetPaper = el.dataset.jumpPaper;
+      const targetTopic = el.dataset.jumpTopic;
+      const activeTab = document.querySelector('.paper-tab[aria-selected="true"]');
+      if (activeTab && activeTab.dataset.paper !== targetPaper){
+        document.querySelectorAll('.paper-tab').forEach(function(x){ x.setAttribute('aria-selected', x.dataset.paper === targetPaper ? 'true' : 'false'); });
+        renderPaper(targetPaper);
+        setTimeout(function(){
+          const tgt = document.getElementById(targetTopic);
+          if (tgt) tgt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      } else {
+        const tgt = document.getElementById(targetTopic);
+        if (tgt) tgt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+}
+
+function wireNotes(){
+  document.querySelectorAll('textarea[data-notes-key]').forEach(function(ta){
+    let timer = null;
+    ta.addEventListener('input', function(){
+      if (timer) clearTimeout(timer);
+      const key = ta.dataset.notesKey;
+      const savedEl = document.getElementById('ns-' + key.replace(/:/g, '_'));
+      if (savedEl) savedEl.textContent = '';
+      timer = setTimeout(function(){
+        if (ta.value.trim()){
+          STATE.notes[key] = ta.value;
+        } else {
+          delete STATE.notes[key];
+        }
+        saveState();
+        if (savedEl) savedEl.textContent = 'saved';
+        setTimeout(function(){ if (savedEl) savedEl.textContent = ''; }, 1500);
+      }, 500);
+    });
+  });
+}
+
+/* Apply current filter to body via class */
+function applyFilter(){
+  document.body.classList.remove('filter-studied', 'filter-bookmarked', 'filter-unstudied');
+  if (STATE.filter && STATE.filter !== 'all'){
+    document.body.classList.add('filter-' + STATE.filter);
+  }
+  document.querySelectorAll('.filter-pill').forEach(function(p){
+    p.classList.toggle('active', p.dataset.filter === STATE.filter);
+  });
 }
 
 function updateProgressBar(paperId){
   const paper = CONTENT[paperId];
   const wrap = document.getElementById('toc-progress');
-  if (!paper.topics){ wrap.style.display = 'none'; return; }
+  const tools = document.getElementById('toc-tools');
+  if (!paper.topics){ wrap.style.display = 'none'; tools.style.display = 'none'; return; }
   wrap.style.display = 'block';
+  tools.style.display = 'block';
   const total = paper.topics.length;
   const done = paper.topics.filter(function(t){ return STATE.studied[topicKey(paperId, t.id)]; }).length;
   document.getElementById('prog-text').innerHTML = '<b>' + done + '</b>/' + total;
@@ -217,6 +319,7 @@ function renderCraft(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
   document.getElementById('toc-progress').style.display = 'none';
+  document.getElementById('toc-tools').style.display = 'none';
   let html = '<section class="paper-section active" data-paper="04">' +
     '<div class="paper-intro craft-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
@@ -239,6 +342,7 @@ function renderReference(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
   document.getElementById('toc-progress').style.display = 'none';
+  document.getElementById('toc-tools').style.display = 'none';
   let html = '<section class="paper-section active" data-paper="05">' +
     '<div class="paper-intro ref-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
@@ -333,6 +437,7 @@ function renderMarker(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
   document.getElementById('toc-progress').style.display = 'none';
+  document.getElementById('toc-tools').style.display = 'none';
   main.innerHTML = '<section class="paper-section active" data-paper="06">' +
     '<div class="paper-intro practice-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>' +
@@ -759,8 +864,21 @@ document.addEventListener('keydown', function(e){
   const inField = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
   const modal = document.getElementById('search-modal');
   const scholarModal = document.getElementById('scholar-modal');
+  const flashModal = document.getElementById('flash-modal');
+  const essayModal = document.getElementById('essay-modal');
   if (scholarModal.classList.contains('active')){
     if (e.key === 'Escape') closeScholar();
+    return;
+  }
+  if (flashModal.classList.contains('active')){
+    if (e.key === 'Escape') flashModal.classList.remove('active');
+    else if (e.key === 'ArrowRight' || e.key === 'Enter'){ e.preventDefault(); showFlash(FLASH_IDX + 1); }
+    else if (e.key === 'ArrowLeft'){ e.preventDefault(); showFlash(FLASH_IDX - 1); }
+    else if (e.key === ' '){ e.preventDefault(); document.getElementById('flash-reveal').click(); }
+    return;
+  }
+  if (essayModal.classList.contains('active')){
+    if (e.key === 'Escape') essayModal.classList.remove('active');
     return;
   }
   const modalOpen = modal.classList.contains('active');
@@ -822,6 +940,154 @@ document.addEventListener('keydown', function(e){
   }
 });
 
+/* ===== FILTER PILLS ===== */
+document.querySelectorAll('.filter-pill').forEach(function(p){
+  p.addEventListener('click', function(){
+    STATE.filter = p.dataset.filter;
+    saveState();
+    applyFilter();
+    toast(STATE.filter === 'all' ? 'Showing all topics' : 'Filtered: ' + p.textContent.trim());
+  });
+});
+
+/* ===== RANDOM TOPIC ===== */
+document.getElementById('tool-random').addEventListener('click', function(){
+  const all = [];
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){ all.push({ paper: p, topic: t }); });
+  });
+  if (!all.length) return;
+  const pick = all[Math.floor(Math.random() * all.length)];
+  const activeTab = document.querySelector('.paper-tab[aria-selected="true"]');
+  if (!activeTab || activeTab.dataset.paper !== pick.paper){
+    document.querySelectorAll('.paper-tab').forEach(function(x){ x.setAttribute('aria-selected', x.dataset.paper === pick.paper ? 'true' : 'false'); });
+    renderPaper(pick.paper);
+    setTimeout(function(){
+      const el = document.getElementById(pick.topic.id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  } else {
+    const el = document.getElementById(pick.topic.id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  toast('Random: ' + stripHtml(pick.topic.title));
+});
+
+/* ===== FLASHCARDS ===== */
+let FLASH_QUOTES = [];
+let FLASH_IDX = 0;
+function buildFlashDeck(){
+  FLASH_QUOTES = [];
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){
+      if (t.quote && t.quote.text){
+        FLASH_QUOTES.push({ paper: p, topicId: t.id, topicTitle: stripHtml(t.title), text: t.quote.text, cite: t.quote.cite });
+      }
+    });
+  });
+  /* shuffle */
+  for (let i = FLASH_QUOTES.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = FLASH_QUOTES[i]; FLASH_QUOTES[i] = FLASH_QUOTES[j]; FLASH_QUOTES[j] = tmp;
+  }
+}
+function showFlash(idx){
+  if (!FLASH_QUOTES.length) buildFlashDeck();
+  if (!FLASH_QUOTES.length) return;
+  FLASH_IDX = ((idx % FLASH_QUOTES.length) + FLASH_QUOTES.length) % FLASH_QUOTES.length;
+  const q = FLASH_QUOTES[FLASH_IDX];
+  document.getElementById('flash-body').innerHTML =
+    '<div class="flash-prompt">Quote</div>' +
+    '<div class="flash-q">&ldquo;' + q.text + '&rdquo;</div>' +
+    '<div class="flash-source" id="flash-source"><div class="src-cite">— ' + q.cite + '</div><div class="src-topic">Paper ' + q.paper + ' &middot; ' + q.topicTitle + '</div></div>';
+  document.getElementById('flash-counter').textContent = (FLASH_IDX + 1) + ' / ' + FLASH_QUOTES.length;
+  document.getElementById('flash-reveal').textContent = 'Reveal';
+}
+document.getElementById('tool-flashcards').addEventListener('click', function(){
+  buildFlashDeck();
+  showFlash(0);
+  document.getElementById('flash-modal').classList.add('active');
+});
+document.getElementById('flash-close').addEventListener('click', function(){
+  document.getElementById('flash-modal').classList.remove('active');
+});
+document.getElementById('flash-modal').addEventListener('click', function(e){
+  if (e.target.id === 'flash-modal') document.getElementById('flash-modal').classList.remove('active');
+});
+document.getElementById('flash-reveal').addEventListener('click', function(){
+  const src = document.getElementById('flash-source');
+  src.classList.toggle('revealed');
+  document.getElementById('flash-reveal').textContent = src.classList.contains('revealed') ? 'Hide' : 'Reveal';
+});
+document.getElementById('flash-next').addEventListener('click', function(){ showFlash(FLASH_IDX + 1); });
+
+/* ===== ESSAY QUESTION GENERATOR ===== */
+let ESSAY_CURRENT = null;
+function generateEssay(){
+  const all = [];
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){ all.push({ paper: p, topic: t }); });
+  });
+  if (!all.length) return null;
+  return all[Math.floor(Math.random() * all.length)];
+}
+function showEssay(){
+  ESSAY_CURRENT = generateEssay();
+  if (!ESSAY_CURRENT) return;
+  const t = ESSAY_CURRENT.topic;
+  document.getElementById('essay-body').innerHTML =
+    '<div class="essay-gen-stem">Paper ' + ESSAY_CURRENT.paper + ' &middot; ' + stripHtml(t.title) + '</div>' +
+    '<div class="essay-gen-q">' + t.exam + '</div>' +
+    '<div class="essay-gen-meta">Suggested timing: 40 minutes &middot; aim for 600-900 words</div>' +
+    '<div class="essay-gen-thesis"><strong>A&#9733; thesis line (revealed after you draft)</strong>' + stripHtml(t.thesis.line) + '</div>';
+}
+document.getElementById('tool-essay-gen').addEventListener('click', function(){
+  showEssay();
+  document.getElementById('essay-modal').classList.add('active');
+});
+document.getElementById('essay-close').addEventListener('click', function(){
+  document.getElementById('essay-modal').classList.remove('active');
+});
+document.getElementById('essay-modal').addEventListener('click', function(e){
+  if (e.target.id === 'essay-modal') document.getElementById('essay-modal').classList.remove('active');
+});
+document.getElementById('essay-new').addEventListener('click', showEssay);
+document.getElementById('essay-jump').addEventListener('click', function(){
+  if (!ESSAY_CURRENT) return;
+  document.getElementById('essay-modal').classList.remove('active');
+  const targetPaper = ESSAY_CURRENT.paper;
+  const targetTopic = ESSAY_CURRENT.topic.id;
+  const activeTab = document.querySelector('.paper-tab[aria-selected="true"]');
+  if (!activeTab || activeTab.dataset.paper !== targetPaper){
+    document.querySelectorAll('.paper-tab').forEach(function(x){ x.setAttribute('aria-selected', x.dataset.paper === targetPaper ? 'true' : 'false'); });
+    renderPaper(targetPaper);
+    setTimeout(function(){
+      const el = document.getElementById(targetTopic);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  } else {
+    const el = document.getElementById(targetTopic);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+
+/* ===== PRINT MODE ===== */
+document.getElementById('tool-print').addEventListener('click', function(){
+  const choice = prompt('Print which topics?\n  1 — all\n  2 — studied only\n  3 — bookmarked only\n\nType 1, 2 or 3:', '1');
+  if (!choice) return;
+  document.body.classList.remove('print-studied', 'print-bookmarked');
+  if (choice.trim() === '2') document.body.classList.add('print-studied');
+  else if (choice.trim() === '3') document.body.classList.add('print-bookmarked');
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){
+      document.body.classList.remove('print-studied', 'print-bookmarked');
+    }, 200);
+  }, 100);
+});
+
 buildScholarIndex();
 buildSearchIndex();
+buildFlashDeck();
 renderPaper('01');
+applyFilter();
