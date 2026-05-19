@@ -40,10 +40,120 @@ function gzNow(){ return Date.now(); }
 function gzStripHtml(s){ return String(s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&middot;/g,'·').replace(/&#9733;/g,'★').replace(/&hellip;/g,'…'); }
 function gzEsc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+/* ---------- text helpers for cloze + typing ---------- */
+const STOP_WORDS = new Set(['the','a','an','and','or','but','of','to','in','on','for','with','by','at','from','as','is','it','this','that','these','those','be','are','was','were','has','have','had','not','no','if','than','then','so','such','its','their','his','her','can','could','should','would','will','may','might','what','who','why','how','when','where']);
+
+function gzSplitSentences(html){
+  // Replace block boundaries with markers so we don't merge headings/paragraphs
+  const marked = String(html || '')
+    .replace(/<\/(p|li|h[1-6]|ol|ul|div)>/gi, '|||')
+    .replace(/<(p|li|h[1-6]|ol|ul|div|br)[^>]*>/gi, '|||');
+  // Split on sentence terminators followed by whitespace + capital, OR on markers
+  const parts = marked.split(/\|\|\|+/);
+  const out = [];
+  parts.forEach(function(chunk){
+    chunk = chunk.replace(/\s+/g, ' ').trim();
+    if (!chunk) return;
+    const sents = chunk.split(/(?<=[.!?])\s+(?=[A-Z"'<])/);
+    sents.forEach(function(s){
+      s = s.trim();
+      if (s.length >= 25) out.push(s);
+    });
+  });
+  return out;
+}
+
+function gzExtractClozes(html){
+  const out = [];
+  const sentences = gzSplitSentences(html);
+  sentences.forEach(function(sentRaw){
+    // Find <strong>X</strong> or <em>X</em> tokens (prefer strong)
+    const tagRe = /<(strong|em)\b[^>]*>([^<]{2,})<\/\1>/gi;
+    let m;
+    while ((m = tagRe.exec(sentRaw)) !== null){
+      const answer = m[2].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
+      if (answer.length < 3 || answer.length > 34) continue;
+      if (/[.!?]\s/.test(answer)) continue;      // skip whole-sentence highlights
+      if (/\d{4,}/.test(answer)) continue;       // skip year-only highlights
+      const words = answer.split(/\s+/);
+      if (words.length > 5) continue;
+      if (words.length === 1 && STOP_WORDS.has(answer.toLowerCase())) continue;
+      // Blank out THIS occurrence only
+      const before = sentRaw.slice(0, m.index);
+      const after = sentRaw.slice(m.index + m[0].length);
+      const blanked = (before + ' _____ ' + after).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').replace(/\s+([.,;:?!])/g, '$1').trim();
+      const plain   = sentRaw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (blanked.length < 35 || blanked.length > 260) continue;
+      out.push({ prompt: blanked, answer: answer, full: plain, source: m[1] });
+    }
+  });
+  // Dedupe by answer (case-insensitive)
+  const seen = new Set();
+  return out.filter(function(c){
+    const k = c.answer.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function gzNormalize(s){
+  return String(s || '').toLowerCase()
+    .replace(/[‘’“”'"`]/g, '')
+    .replace(/[.,;:!?()\[\]{}\-—–]/g, ' ')
+    .replace(/&amp;/g, 'and').replace(/&/g, 'and')
+    .replace(/\s+/g, ' ').trim();
+}
+function gzLevenshtein(a, b){
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++){
+    let cur = [i];
+    for (let j = 1; j <= b.length; j++){
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      cur[j] = Math.min(cur[j-1] + 1, prev[j] + 1, prev[j-1] + cost);
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+  }
+  return prev[b.length];
+}
+function gzMatchAnswer(input, target){
+  const a = gzNormalize(input), b = gzNormalize(target);
+  if (!a) return 'wrong';
+  if (a === b) return 'right';
+  // Surname-only match for multi-word answers (e.g. "Russell" for "Bertrand Russell")
+  const aWords = a.split(' '), bWords = b.split(' ');
+  if (bWords.length > 1 && aWords.length === 1 && bWords[bWords.length - 1] === aWords[0]) return 'right';
+  if (aWords.length > 1 && bWords.length === 1 && aWords[aWords.length - 1] === bWords[0]) return 'right';
+  // Levenshtein tolerance
+  const d = gzLevenshtein(a, b);
+  const len = Math.max(a.length, b.length);
+  if (d <= 2 || d / len <= 0.18) return 'close';
+  // Substring overlap (allow extra qualifiers)
+  if (a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return 'close';
+  return 'wrong';
+}
+
 /* ---------- deck + card generation ---------- */
 let GIZMO_DECKS = null;          // [{ id, paper, topicId, title, cards:[card,...] }]
 let GIZMO_ALL_CARDS = [];        // flat
-let GIZMO_SCHOLAR_POOL = [];     // distinct scholar names for distractors
+let GIZMO_SCHOLAR_POOL = [];     // distinct scholar names for MCQ distractors
+const CARDS_PER_DECK = 50;
+
+function gzCard(deckCtx, kind, suffix, fields){
+  return Object.assign({
+    id: deckCtx.id + '_' + kind + suffix,
+    deckId: deckCtx.id,
+    paper: deckCtx.paper,
+    topicId: deckCtx.topicId,
+    topicTitle: deckCtx.topicTitlePlain,
+    context: 'Paper ' + deckCtx.paper + ' · ' + deckCtx.topicTitlePlain,
+    type: kind
+  }, fields);
+}
 
 function buildDecks(){
   GIZMO_DECKS = [];
@@ -53,31 +163,184 @@ function buildDecks(){
     const paper = (typeof CONTENT !== 'undefined' && CONTENT[paperId]) || null;
     if (!paper || !paper.topics) return;
     paper.topics.forEach(function(t){
-      const deckId = 'd_' + paperId + '_' + t.id;
       const deck = {
-        id: deckId,
+        id: 'd_' + paperId + '_' + t.id,
         paper: paperId,
         topicId: t.id,
         title: t.title || t.id,
         topicTitlePlain: gzStripHtml(t.title || t.id),
         cards: []
       };
+
+      // --- Scholar cards: forward (name->position), reverse (position->name), context fact, and a self-cloze
       (t.scholars || []).forEach(function(s, i){
         if (!s.pos || s.pos.length < 18) return;
         scholarSet.add(s.name);
-        const cardId = deckId + '_s' + i;
-        deck.cards.push({
-          id: cardId,
-          deckId: deckId,
-          paper: paperId,
-          topicId: t.id,
-          topicTitle: deck.topicTitlePlain,
+        // Forward: name -> position
+        deck.cards.push(gzCard(deck, 'scholar', i + 'f', {
           front: s.name,
           back: s.pos,
-          context: 'Paper ' + paperId + ' · ' + deck.topicTitlePlain,
-          type: 'scholar'
-        });
+          prompt: 'Summarise the position of ' + s.name + '.',
+          answer: null,
+          typeable: false,
+          mcqAnswer: s.name
+        }));
+        // Reverse: position -> name (typeable)
+        deck.cards.push(gzCard(deck, 'scholar', i + 'r', {
+          front: '"' + s.pos + '"',
+          back: s.name,
+          prompt: 'Whose position is this?\n“' + s.pos + '”',
+          answer: s.name,
+          typeable: true,
+          mcqAnswer: s.name,
+          mcqPrompt: s.pos
+        }));
+        // Context fact: scholar -> topic
+        deck.cards.push(gzCard(deck, 'scholar', i + 't', {
+          front: 'Topic associated with ' + s.name,
+          back: deck.topicTitlePlain + ' (Paper ' + paperId + ')',
+          prompt: 'Which H573 topic is ' + s.name + ' associated with?',
+          answer: deck.topicTitlePlain,
+          typeable: true
+        }));
+        // Self-cloze: blank out scholar surname from their own position
+        const surname = s.name.split(' ').slice(-1)[0];
+        if (surname.length > 2 && s.pos.indexOf(surname) !== -1){
+          const blanked = s.pos.replace(new RegExp('\\b' + surname.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b','g'), '_____');
+          if (blanked !== s.pos){
+            deck.cards.push(gzCard(deck, 'cloze', i + 'sn', {
+              front: blanked,
+              back: surname,
+              prompt: blanked,
+              answer: surname,
+              full: s.pos,
+              typeable: true,
+              mcqAnswer: surname,
+              mcqPrompt: blanked
+            }));
+          }
+        }
+        // Year cloze: if position contains a 4-digit year, blank it
+        const yearMatch = s.pos.match(/\b(1[6-9]\d{2}|20\d{2})\b/);
+        if (yearMatch){
+          const yearBlanked = s.pos.replace(yearMatch[0], '_____');
+          deck.cards.push(gzCard(deck, 'cloze', i + 'y', {
+            front: yearBlanked,
+            back: yearMatch[0],
+            prompt: 'Fill the year:\n' + yearBlanked,
+            answer: yearMatch[0],
+            full: s.pos,
+            typeable: true
+          }));
+        }
+        // Quoted-phrase cloze: blank out the first quoted phrase in the position
+        const quoteRe = /['‘"“]([^'‘"”’]{6,80})['’"”]/;
+        const qm = s.pos.match(quoteRe);
+        if (qm){
+          const quoted = qm[1];
+          const qBlanked = s.pos.replace(qm[0], '"_____"');
+          deck.cards.push(gzCard(deck, 'cloze', i + 'q', {
+            front: qBlanked,
+            back: quoted,
+            prompt: s.name + ' coined this phrase — fill the gap:\n' + qBlanked,
+            answer: quoted,
+            full: s.pos,
+            typeable: true
+          }));
+        }
       });
+
+      // --- Small fixed-set cards (always kept): quote, thesis, spec, exam
+      if (t.quote && t.quote.text && t.quote.cite){
+        const cite = t.quote.cite;
+        const author = cite.split(/[,–—-]/)[0].trim();
+        deck.cards.push(gzCard(deck, 'quote', 'q', {
+          front: '"' + t.quote.text + '"',
+          back: cite,
+          prompt: 'Who is the source of this quote?\n“' + t.quote.text + '”',
+          answer: author,
+          full: t.quote.text + ' — ' + cite,
+          typeable: true
+        }));
+        deck.cards.push(gzCard(deck, 'quote', 'qr', {
+          front: 'Quote attributed to: ' + cite,
+          back: t.quote.text,
+          prompt: 'Cite the quote attributed to ' + cite + '.',
+          answer: t.quote.text.slice(0, 80),
+          typeable: false
+        }));
+      }
+      if (t.thesis && t.thesis.line){
+        deck.cards.push(gzCard(deck, 'thesis', '', {
+          front: 'A★ thesis line for ' + deck.topicTitlePlain,
+          back: gzStripHtml(t.thesis.line),
+          prompt: 'State the A★ thesis line for ' + deck.topicTitlePlain + '.',
+          answer: null,
+          typeable: false
+        }));
+      }
+      (t.spec || []).forEach(function(sp, i){
+        deck.cards.push(gzCard(deck, 'spec', i, {
+          front: 'Spec keyword: ' + sp,
+          back: deck.topicTitlePlain,
+          prompt: 'Which H573 topic does this spec keyword belong to?\n«' + sp + '»',
+          answer: deck.topicTitlePlain,
+          typeable: false
+        }));
+      });
+      if (t.exam){
+        deck.cards.push(gzCard(deck, 'exam', '', {
+          front: t.exam,
+          back: deck.topicTitlePlain + ' (Paper ' + paperId + ')',
+          prompt: 'Which topic does this past-paper question belong to?\n' + t.exam,
+          answer: deck.topicTitlePlain,
+          typeable: false
+        }));
+      }
+
+      // --- Variable-length cards (trimmable): headings + clozes
+      const variable = [];
+      const headingRe = /<(h[34])\b[^>]*>([^<]{4,120})<\/\1>/gi;
+      const headings = new Set();
+      [t.ao1 || '', t.ao2 || ''].forEach(function(src){
+        let hm;
+        while ((hm = headingRe.exec(src)) !== null){
+          const txt = hm[2].replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').trim();
+          if (txt.length >= 4 && txt.length <= 90 && !headings.has(txt.toLowerCase())) headings.add(txt);
+        }
+      });
+      let hi = 0;
+      headings.forEach(function(h){
+        if (hi >= 5) return;
+        variable.push(gzCard(deck, 'heading', hi, {
+          front: 'Section heading: "' + h + '"',
+          back: deck.topicTitlePlain,
+          prompt: 'Which H573 topic contains the section heading:\n"' + h + '"?',
+          answer: deck.topicTitlePlain,
+          typeable: true
+        }));
+        hi++;
+      });
+      const sources = [t.orientation || '', t.ao1 || '', t.ao2 || '', (t.thesis && t.thesis.unpacking) || '', (t.thesis && t.thesis.line) || ''];
+      const clozes = gzExtractClozes(sources.join(' || '));
+      clozes.forEach(function(c, i){
+        variable.push(gzCard(deck, 'cloze', i, {
+          front: c.prompt,
+          back: c.answer,
+          prompt: c.prompt,
+          answer: c.answer,
+          full: c.full,
+          typeable: true,
+          mcqAnswer: c.answer,
+          mcqPrompt: c.prompt
+        }));
+      });
+
+      // Add as many variable cards as fit under the cap
+      const room = Math.max(0, CARDS_PER_DECK - deck.cards.length);
+      deck.cards = deck.cards.concat(variable.slice(0, room));
+      // If still under cap and we have extra clozes, that's fine — they were trimmed
+      if (deck.cards.length > CARDS_PER_DECK) deck.cards = deck.cards.slice(0, CARDS_PER_DECK);
       if (deck.cards.length){
         GIZMO_DECKS.push(deck);
         GIZMO_ALL_CARDS = GIZMO_ALL_CARDS.concat(deck.cards);
@@ -199,16 +462,19 @@ let GZ_SESSION = null;   // { mode, deckId, queue:[card], idx, results:{again,ha
 
 function buildSessionQueue(opts){
   // opts.deckId — single deck or 'all'
-  // opts.mode — 'study' | 'quiz' | 'review'
+  // opts.mode — 'study' | 'quiz' | 'type'
   // opts.scope — 'new' | 'due' | 'all' | 'mixed' (mixed = due + a few new)
   let cards = (opts.deckId === 'all' || !opts.deckId)
     ? GIZMO_ALL_CARDS.slice()
     : (GIZMO_DECKS.find(function(d){ return d.id === opts.deckId; }) || { cards: [] }).cards.slice();
+  // Mode-specific filtering
+  if (opts.mode === 'type') cards = cards.filter(function(c){ return c.typeable; });
+  else if (opts.mode === 'quiz') cards = cards.filter(function(c){ return !!c.mcqAnswer; });
   if (opts.scope === 'due') cards = cards.filter(function(c){ return gzIsDue(c.id); });
   else if (opts.scope === 'new') cards = cards.filter(function(c){ return gzCardLevel(c.id) === 'new'; });
   else if (opts.scope === 'mixed'){
     const due = cards.filter(function(c){ return gzIsDue(c.id); });
-    const fresh = cards.filter(function(c){ return gzCardLevel(c.id) === 'new'; }).slice(0, Math.max(5, 12 - due.length));
+    const fresh = cards.filter(function(c){ return gzCardLevel(c.id) === 'new'; }).slice(0, Math.max(5, 15 - due.length));
     cards = due.concat(fresh);
   }
   // shuffle
@@ -284,7 +550,10 @@ function renderDecksPanel(){
       '<span class="cta-sub">' + (s.due
         ? 'Start a mixed daily review session to keep your streak going.'
         : 'You’re caught up. Pick a deck below to learn new cards.') + '</span></div>' +
-    '<button class="gizmo-cta-btn" data-gz-start="all-mixed"' + (s.total === 0 ? ' disabled' : '') + '><span class="ico">&#9658;</span> Start daily review</button>' +
+    '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end">' +
+      '<button class="gizmo-cta-btn" data-gz-start="all-mixed"' + (s.total === 0 ? ' disabled' : '') + '><span class="ico">&#9658;</span> Daily review</button>' +
+      '<button class="gizmo-cta-btn" data-gz-start="all-type" style="background:var(--wash);color:var(--ink);border:1px solid var(--rule-strong)"' + (s.total === 0 ? ' disabled' : '') + '><span class="ico">&#9998;</span> Type mode</button>' +
+    '</div>' +
   '</div>';
   html += '<input type="text" class="gizmo-search" id="gz-deck-search" placeholder="Search a topic, scholar, or paper&hellip;" autocomplete="off">';
   html += '<div id="gz-deck-list">' + renderDeckList('') + '</div>';
@@ -332,6 +601,7 @@ function renderDeckList(query){
         '</div>' +
         '<div class="gizmo-deck-actions">' +
           '<button class="primary" data-gz-start="deck-mixed" data-deck="' + d.id + '">' + (sum.due ? 'Review ' + sum.due : 'Study') + '</button>' +
+          '<button data-gz-start="deck-type" data-deck="' + d.id + '" title="Type the answer">Type</button>' +
           '<button data-gz-start="deck-quiz" data-deck="' + d.id + '">Quiz</button>' +
         '</div>' +
       '</div>';
@@ -370,6 +640,7 @@ function renderReviewPanel(s){
         '<div class="gizmo-deck-meta">Paper ' + x.deck.paper + ' · ' + x.sum.total + ' cards</div>' +
         '<div class="gizmo-deck-actions">' +
           '<button class="primary" data-gz-start="deck-due" data-deck="' + x.deck.id + '">Review ' + x.sum.due + '</button>' +
+          '<button data-gz-start="deck-type" data-deck="' + x.deck.id + '" title="Type the answer">Type</button>' +
           '<button data-gz-start="deck-quiz" data-deck="' + x.deck.id + '">Quiz</button>' +
         '</div></div>';
     });
@@ -512,8 +783,10 @@ function attachDeckStartHandlers(){
       if (kind === 'all-mixed')   startSession({ mode: 'study', deckId: 'all', scope: 'mixed' });
       else if (kind === 'all-due')   startSession({ mode: 'study', deckId: 'all', scope: 'due' });
       else if (kind === 'all-new')   startSession({ mode: 'study', deckId: 'all', scope: 'new' });
+      else if (kind === 'all-type')  startSession({ mode: 'type',  deckId: 'all', scope: 'mixed' });
       else if (kind === 'deck-mixed') startSession({ mode: 'study', deckId: deckId, scope: 'mixed' });
       else if (kind === 'deck-due')   startSession({ mode: 'study', deckId: deckId, scope: 'due' });
+      else if (kind === 'deck-type')  startSession({ mode: 'type',  deckId: deckId, scope: 'mixed' });
       else if (kind === 'deck-quiz')  startSession({ mode: 'quiz',  deckId: deckId, scope: 'mixed' });
     });
   });
@@ -550,20 +823,35 @@ function renderSessionCard(){
   }
   const card = GZ_SESSION.queue[GZ_SESSION.idx];
   const deck = GIZMO_DECKS.find(function(d){ return d.id === card.deckId; });
-  head.textContent = (GZ_SESSION.mode === 'quiz' ? 'Quiz · ' : '') + (deck ? gzStripHtml(deck.title) : 'Mixed');
+  const modePrefix = GZ_SESSION.mode === 'quiz' ? 'Quiz · ' : GZ_SESSION.mode === 'type' ? 'Type · ' : '';
+  head.textContent = modePrefix + (deck ? gzStripHtml(deck.title) : 'Mixed');
   fill.style.width = ((GZ_SESSION.idx / GZ_SESSION.queue.length) * 100) + '%';
   count.textContent = (GZ_SESSION.idx + 1) + ' / ' + GZ_SESSION.queue.length;
   if (GZ_SESSION.mode === 'quiz') renderQuizCard(card, body);
+  else if (GZ_SESSION.mode === 'type') renderTypeCard(card, body);
   else renderStudyCard(card, body);
+}
+
+function gzCardLabels(card){
+  switch (card.type){
+    case 'scholar': return { front: 'Scholar', back: 'Position', tap: 'Tap to reveal their position' };
+    case 'cloze':   return { front: 'Fill the gap', back: 'Answer', tap: 'Tap to reveal the missing term' };
+    case 'quote':   return { front: 'Quote', back: 'Source', tap: 'Tap to reveal the source' };
+    case 'thesis':  return { front: 'Thesis prompt', back: 'A★ thesis line', tap: 'Tap to reveal the model line' };
+    case 'spec':    return { front: 'Spec keyword', back: 'Topic', tap: 'Tap to reveal the topic' };
+    case 'exam':    return { front: 'Exam question', back: 'Topic', tap: 'Tap to reveal the topic' };
+    default:        return { front: 'Front', back: 'Back', tap: 'Tap to reveal' };
+  }
 }
 
 function renderStudyCard(card, body){
   const ints = gzPreviewIntervals(card.id);
+  const lbl = gzCardLabels(card);
   body.innerHTML =
     '<div class="gizmo-card" id="gz-card">' +
-      '<div class="gizmo-card-side">Scholar</div>' +
+      '<div class="gizmo-card-side">' + lbl.front + '</div>' +
       '<div class="gizmo-card-front">' + gzEsc(card.front) + '</div>' +
-      '<div class="gizmo-card-tap">Tap card to reveal their position</div>' +
+      '<div class="gizmo-card-tap">' + lbl.tap + '</div>' +
     '</div>' +
     '<div class="gizmo-grade">' +
       '<button class="gizmo-grade-btn again dim" data-grade="0"><span class="grade-label">Again</span><span class="grade-int">' + ints[0] + '</span></button>' +
@@ -577,10 +865,12 @@ function renderStudyCard(card, body){
     if (flipped) return;
     flipped = true;
     cardEl.classList.add('flipped');
+    const isQuoteLike = (card.type === 'scholar' || card.type === 'quote');
+    const wrap = isQuoteLike ? ['&ldquo;', '&rdquo;'] : ['', ''];
     cardEl.innerHTML =
-      '<div class="gizmo-card-side">Position</div>' +
-      '<div class="gizmo-card-back">&ldquo;' + gzEsc(card.back) + '&rdquo;</div>' +
-      '<div class="gizmo-card-context"><strong>' + gzEsc(card.front) + '</strong> · ' + gzEsc(card.context) + '</div>';
+      '<div class="gizmo-card-side">' + lbl.back + '</div>' +
+      '<div class="gizmo-card-back">' + wrap[0] + gzEsc(card.back) + wrap[1] + '</div>' +
+      '<div class="gizmo-card-context">' + gzEsc(card.context) + '</div>';
     document.querySelectorAll('.gizmo-grade-btn').forEach(function(b){ b.classList.remove('dim'); });
   });
   document.querySelectorAll('.gizmo-grade-btn').forEach(function(b){
@@ -603,30 +893,45 @@ function renderStudyCard(card, body){
 }
 
 function renderQuizCard(card, body){
-  // pick 3 distractors from same paper if possible, else from global pool
-  const sameDeck = GIZMO_DECKS.find(function(d){ return d.id === card.deckId; });
-  const samePaperScholars = sameDeck
-    ? GIZMO_DECKS.filter(function(d){ return d.paper === card.paper; }).reduce(function(acc, d){
-        d.cards.forEach(function(c){ if (c.front !== card.front) acc.add(c.front); });
+  const correct = card.mcqAnswer || card.back;
+  const promptText = card.mcqPrompt || card.back;
+  // distractor pool: same answer type from same paper, else global pool
+  let pool;
+  if (card.type === 'cloze'){
+    pool = GIZMO_ALL_CARDS
+      .filter(function(c){ return c.type === 'cloze' && c.paper === card.paper && c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase(); })
+      .map(function(c){ return c.mcqAnswer; });
+    if (pool.length < 3) pool = GIZMO_ALL_CARDS
+      .filter(function(c){ return c.type === 'cloze' && c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase(); })
+      .map(function(c){ return c.mcqAnswer; });
+  } else {
+    pool = GIZMO_DECKS
+      .filter(function(d){ return d.paper === card.paper; })
+      .reduce(function(acc, d){
+        d.cards.forEach(function(c){
+          if (c.mcqAnswer && c.mcqAnswer !== correct && c.type === 'scholar') acc.add(c.mcqAnswer);
+        });
         return acc;
-      }, new Set())
-    : new Set();
-  let pool = Array.from(samePaperScholars);
-  if (pool.length < 3) pool = GIZMO_SCHOLAR_POOL.filter(function(n){ return n !== card.front; });
-  // shuffle pool, take 3
+      }, new Set());
+    pool = Array.from(pool);
+    if (pool.length < 3) pool = GIZMO_SCHOLAR_POOL.filter(function(n){ return n !== correct; });
+  }
+  // dedupe + shuffle
+  pool = Array.from(new Set(pool));
   for (let i = pool.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
   }
-  const options = [card.front].concat(pool.slice(0, 3));
+  const options = [correct].concat(pool.slice(0, 3));
   for (let i = options.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = options[i]; options[i] = options[j]; options[j] = tmp;
   }
+  const questionHead = card.type === 'cloze' ? 'Fill the gap' : 'Whose position is this?';
   body.innerHTML =
     '<div class="gizmo-quiz">' +
-      '<div class="gizmo-quiz-prompt">Whose position is this?</div>' +
-      '<div class="gizmo-quiz-q">&ldquo;' + gzEsc(card.back) + '&rdquo;</div>' +
+      '<div class="gizmo-quiz-prompt">' + questionHead + '</div>' +
+      '<div class="gizmo-quiz-q">' + (card.type === 'cloze' ? gzEsc(promptText) : '&ldquo;' + gzEsc(promptText) + '&rdquo;') + '</div>' +
       '<div class="gizmo-quiz-opts">' +
         options.map(function(o){ return '<button class="gizmo-quiz-opt" data-opt="' + gzEsc(o) + '">' + gzEsc(o) + '</button>'; }).join('') +
       '</div>' +
@@ -639,18 +944,18 @@ function renderQuizCard(card, body){
       if (answered) return;
       answered = true;
       const ans = b.dataset.opt;
-      const correct = ans === card.front;
+      const isRight = ans === correct;
       document.querySelectorAll('.gizmo-quiz-opt').forEach(function(x){
         x.classList.add('locked');
-        if (x.dataset.opt === card.front) x.classList.add('correct');
+        if (x.dataset.opt === correct) x.classList.add('correct');
         else if (x === b) x.classList.add('wrong');
       });
       const fb = document.getElementById('gz-quiz-fb');
-      fb.className = 'gizmo-quiz-feedback show ' + (correct ? 'right' : 'wrong');
-      fb.innerHTML = '<strong>' + (correct ? '✓ Correct.' : '✗ Not quite.') + '</strong> The position is held by <strong>' + gzEsc(card.front) + '</strong> — ' + gzEsc(card.context) + '.';
-      gzGradeCard(card.id, correct ? 2 : 0);
+      fb.className = 'gizmo-quiz-feedback show ' + (isRight ? 'right' : 'wrong');
+      fb.innerHTML = '<strong>' + (isRight ? '✓ Correct.' : '✗ Not quite.') + '</strong> Answer: <strong>' + gzEsc(correct) + '</strong> — ' + gzEsc(card.context) + '.';
+      gzGradeCard(card.id, isRight ? 2 : 0);
       const r = GZ_SESSION.results;
-      if (correct){ r.good += 1; r.correct += 1; }
+      if (isRight){ r.good += 1; r.correct += 1; }
       else { r.again += 1; r.wrong += 1; }
       document.getElementById('gz-quiz-next').classList.add('show');
     });
@@ -659,6 +964,85 @@ function renderQuizCard(card, body){
     if (!answered) return;
     GZ_SESSION.idx += 1;
     renderSessionCard();
+  });
+}
+
+function renderTypeCard(card, body){
+  const ints = gzPreviewIntervals(card.id);
+  const answer = card.answer || card.back || '';
+  const promptLines = (card.prompt || card.front || '').split(/\n/);
+  const promptHead = promptLines.length > 1 ? promptLines[0] : (card.type === 'cloze' ? 'Fill the missing word' : 'Type your answer');
+  const promptBody = promptLines.length > 1 ? promptLines.slice(1).join(' ') : (card.prompt || card.front);
+  const wordHint = answer.trim().split(/\s+/).length;
+  body.innerHTML =
+    '<div class="gizmo-type" id="gz-type">' +
+      '<div class="gizmo-type-prompt">' + gzEsc(promptHead) + '</div>' +
+      '<div class="gizmo-type-q">' + gzEsc(promptBody) + '</div>' +
+      '<form class="gizmo-type-form" id="gz-type-form" autocomplete="off">' +
+        '<input type="text" class="gizmo-type-input" id="gz-type-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the answer (' + wordHint + ' word' + (wordHint === 1 ? '' : 's') + ')&hellip;">' +
+        '<button type="submit" class="gizmo-type-submit" id="gz-type-submit">Check</button>' +
+      '</form>' +
+      '<div class="gizmo-type-feedback" id="gz-type-fb"></div>' +
+    '</div>' +
+    '<div class="gizmo-grade" id="gz-type-grade" style="display:none">' +
+      '<button class="gizmo-grade-btn again" data-grade="0"><span class="grade-label">Again</span><span class="grade-int">' + ints[0] + '</span></button>' +
+      '<button class="gizmo-grade-btn hard"  data-grade="1"><span class="grade-label">Hard</span><span class="grade-int">' + ints[1] + '</span></button>' +
+      '<button class="gizmo-grade-btn good"  data-grade="2"><span class="grade-label">Good</span><span class="grade-int">' + ints[2] + '</span></button>' +
+      '<button class="gizmo-grade-btn easy"  data-grade="3"><span class="grade-label">Easy</span><span class="grade-int">' + ints[3] + '</span></button>' +
+    '</div>';
+  const input = document.getElementById('gz-type-input');
+  const fb = document.getElementById('gz-type-fb');
+  const grade = document.getElementById('gz-type-grade');
+  setTimeout(function(){ try { input.focus(); } catch(e){} }, 30);
+  let revealed = false;
+  let presetGrade = null;
+
+  function reveal(typed){
+    revealed = true;
+    const verdict = gzMatchAnswer(typed, answer);
+    input.disabled = true;
+    document.getElementById('gz-type-submit').disabled = true;
+    fb.className = 'gizmo-type-feedback show ' + (verdict === 'right' ? 'right' : verdict === 'close' ? 'almost' : 'wrong');
+    let label = verdict === 'right' ? '✓ Correct' : verdict === 'close' ? '≈ Almost' : '✗ Not quite';
+    let body = verdict === 'right'
+        ? 'Answer: <strong>' + gzEsc(answer) + '</strong>'
+        : 'You typed <em>' + gzEsc(typed || '(nothing)') + '</em>. Answer: <strong>' + gzEsc(answer) + '</strong>';
+    if (card.full && card.type === 'cloze'){
+      const re = new RegExp('\\b' + answer.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b','i');
+      const highlighted = gzEsc(card.full).replace(re, '<u><strong>' + gzEsc(answer) + '</strong></u>');
+      body += '<div class="gizmo-type-full">' + highlighted + '</div>';
+    } else if (card.context){
+      body += '<div class="gizmo-type-full">' + gzEsc(card.context) + '</div>';
+    }
+    fb.innerHTML = '<strong>' + label + '.</strong> ' + body;
+    grade.style.display = 'grid';
+    presetGrade = verdict === 'right' ? 2 : verdict === 'close' ? 1 : 0;
+    document.querySelectorAll('#gz-type-grade .gizmo-grade-btn').forEach(function(b){
+      const g = parseInt(b.dataset.grade, 10);
+      b.classList.toggle('suggested', g === presetGrade);
+    });
+  }
+
+  document.getElementById('gz-type-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    if (revealed) return;
+    reveal(input.value.trim());
+  });
+  document.querySelectorAll('#gz-type-grade .gizmo-grade-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      if (!revealed) return;
+      const g = parseInt(b.dataset.grade, 10);
+      gzGradeCard(card.id, g);
+      const r = GZ_SESSION.results;
+      if (g === 0) r.again += 1;
+      else if (g === 1) r.hard += 1;
+      else if (g === 2) r.good += 1;
+      else r.easy += 1;
+      if (g >= 2) r.correct += 1; else r.wrong += 1;
+      if (g === 0 && GZ_SESSION.queue.length < 30) GZ_SESSION.queue.push(card);
+      GZ_SESSION.idx += 1;
+      renderSessionCard();
+    });
   });
 }
 
