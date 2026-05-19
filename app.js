@@ -5,37 +5,32 @@ function stripHtml(s){ return (s || '').replace(/<[^>]+>/g, ''); }
 function renderPaper(paperId){
   const paper = CONTENT[paperId];
   if (!paper) return;
+  if (paperId === '04') return renderCraft(paper);
+  if (paperId === '05') return renderReference(paper);
+  if (paperId === '06') return renderMarker(paper);
+  return renderTopicPaper(paperId, paper);
+}
+
+function renderTopicPaper(paperId, paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
-
   let html = '<section class="paper-section active" data-paper="' + paperId + '">' +
-    '<div class="paper-intro">' +
-    '<div class="eyebrow">' + paper.code + ' &middot; Paper ' + paperId + '</div>' +
-    '<h1>' + paper.title + '</h1>' +
-    '<p class="lede">' + paper.intro + '</p>' +
-    '</div>';
-
+    '<div class="paper-intro"><div class="eyebrow">' + paper.code + ' &middot; Paper ' + paperId + '</div>' +
+    '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
   paper.topics.forEach(function(t, i){
     const num = String(i + 1).padStart(2, '0');
     html += '<article class="topic" id="' + t.id + '">' +
-      '<header class="topic-header">' +
-        '<div class="topic-num">&sect; ' + num + '</div>' +
-        '<div class="topic-title-block">' +
-          '<h2>' + t.title + '</h2>' +
-          '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div>' +
-        '</div>' +
-      '</header>' +
+      '<header class="topic-header"><div class="topic-num">&sect; ' + num + '</div>' +
+      '<div class="topic-title-block"><h2>' + t.title + '</h2>' +
+      '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div></div></header>' +
       '<p class="orientation">' + t.orientation + '</p>' +
       '<div class="ao-grid">' +
         '<div class="ao"><div class="ao-label">AO1 <small>Knowledge &amp; Understanding</small></div>' + t.ao1 + '</div>' +
         '<div class="ao"><div class="ao-label">AO2 <small>Evaluation &amp; Argument</small></div>' + t.ao2 + '</div>' +
       '</div>' +
-      '<div class="thesis">' +
-        '<div class="thesis-label">The A&#9733; line &middot; commit to this</div>' +
-        '<div class="thesis-line">' + t.thesis.line + '</div>' +
-        '<div class="thesis-unpacking">' + t.thesis.unpacking + '</div>' +
-      '</div>';
-
+      '<div class="thesis"><div class="thesis-label">The A&#9733; line &middot; commit to this</div>' +
+      '<div class="thesis-line">' + t.thesis.line + '</div>' +
+      '<div class="thesis-unpacking">' + t.thesis.unpacking + '</div></div>';
     if (t.scholars && t.scholars.length){
       html += '<div class="scholar-list"><div class="scholar-list-label">Scholar bank</div>';
       t.scholars.forEach(function(s){
@@ -43,33 +38,390 @@ function renderPaper(paperId){
       });
       html += '</div>';
     }
-
-    html += '<div class="extras">' +
-        '<blockquote class="quote">&ldquo;' + t.quote.text + '&rdquo;<cite>' + t.quote.cite + '</cite></blockquote>' +
-        '<div class="exam-prompt">' + t.exam + '</div>' +
-      '</div>' +
-    '</article>';
+    html += '<div class="extras"><blockquote class="quote">&ldquo;' + t.quote.text + '&rdquo;<cite>' + t.quote.cite + '</cite></blockquote>' +
+      '<div class="exam-prompt">' + t.exam + '</div></div></article>';
   });
-
   html += '</section>';
   main.innerHTML = html;
-
   toc.innerHTML = paper.topics.map(function(t){
     return '<li><a href="#' + t.id + '">' + stripHtml(t.title) + '</a></li>';
   }).join('');
-
-  setupScrollSpy();
+  setupScrollSpy('.topic');
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-function setupScrollSpy(){
+function renderCraft(paper){
+  const main = document.getElementById('main');
+  const toc = document.getElementById('toc-list');
+  let html = '<section class="paper-section active" data-paper="04">' +
+    '<div class="paper-intro craft-intro"><div class="eyebrow">' + paper.code + '</div>' +
+    '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
+  paper.sections.forEach(function(s, i){
+    const num = String(i + 1).padStart(2, '0');
+    html += '<article class="craft-section" id="' + s.id + '">' +
+      '<header class="craft-head"><div class="craft-num">&sect; ' + num + '</div>' +
+      '<h2 class="craft-title">' + s.title + '</h2></header>' + s.html + '</article>';
+  });
+  html += '</section>';
+  main.innerHTML = html;
+  toc.innerHTML = paper.sections.map(function(s){
+    return '<li><a href="#' + s.id + '">' + stripHtml(s.title) + '</a></li>';
+  }).join('');
+  setupScrollSpy('.craft-section');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderReference(paper){
+  const main = document.getElementById('main');
+  const toc = document.getElementById('toc-list');
+  let html = '<section class="paper-section active" data-paper="05">' +
+    '<div class="paper-intro ref-intro"><div class="eyebrow">' + paper.code + '</div>' +
+    '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
+  paper.sections.forEach(function(s, i){
+    const num = String(i + 1).padStart(2, '0');
+    html += '<article class="ref-section" id="' + s.id + '">' +
+      '<header class="ref-head"><div class="ref-num">&sect; ' + num + '</div>' +
+      '<h2 class="ref-title">' + s.title + '</h2></header>';
+    if (s.kind === 'glossary') html += renderGlossary(s);
+    else if (s.kind === 'timeline') html += renderTimeline(s);
+    html += '</article>';
+  });
+  html += '</section>';
+  main.innerHTML = html;
+  toc.innerHTML = paper.sections.map(function(s){
+    return '<li><a href="#' + s.id + '">' + stripHtml(s.title) + '</a></li>';
+  }).join('');
+  setupGlossary();
+  setupScrollSpy('.ref-section');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderGlossary(s){
+  const letters = Array.from(new Set(s.items.map(function(i){ return i.term[0].toUpperCase(); }))).sort();
+  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  let html = '<p class="ref-desc">Technical terms across the H573 specification. Filter by letter or search.</p>' +
+    '<div class="gloss-filter"><input type="text" class="gloss-search" id="gloss-search" placeholder="Filter terms..." /></div>' +
+    '<div class="gloss-letters" id="gloss-letters"><button class="gloss-letter active" data-letter="">All</button>';
+  allLetters.forEach(function(L){
+    const has = letters.indexOf(L) >= 0;
+    html += '<button class="gloss-letter" data-letter="' + L + '"' + (has ? '' : ' disabled') + '>' + L + '</button>';
+  });
+  html += '</div><div class="gloss-list" id="gloss-list">';
+  s.items.forEach(function(item){
+    html += '<div class="gloss-item" data-term="' + item.term.toLowerCase() + '" data-letter="' + item.term[0].toUpperCase() + '">' +
+      '<div class="gloss-term"><span>' + item.term + '</span><span class="gp">' + item.paper + '</span></div>' +
+      '<div class="gloss-def">' + item.def + '</div></div>';
+  });
+  html += '</div><div class="gloss-empty" id="gloss-empty" style="display:none">No terms match.</div>';
+  return html;
+}
+
+function renderTimeline(s){
+  let html = '<p class="ref-desc">Chronology of thinkers named in the H573 specification.</p>';
+  s.entries.forEach(function(era){
+    html += '<div class="tl-era"><h3>' + era.era + '</h3><div class="tl-thinkers">';
+    era.thinkers.forEach(function(t){
+      html += '<div class="tl-thinker"><div class="tl-name">' + t.name + '</div>' +
+        '<div class="tl-dates">' + t.dates + '</div>' +
+        '<div class="tl-contribution">' + t.contribution + '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  return html;
+}
+
+function setupGlossary(){
+  const gs = document.getElementById('gloss-search');
+  if (!gs) return;
+  let activeLetter = '';
+  const items = document.querySelectorAll('.gloss-item');
+  const empty = document.getElementById('gloss-empty');
+  function applyFilter(){
+    const q = gs.value.toLowerCase().trim();
+    let shown = 0;
+    items.forEach(function(it){
+      const term = it.dataset.term;
+      const matchQ = !q || term.indexOf(q) >= 0 || it.textContent.toLowerCase().indexOf(q) >= 0;
+      const matchL = !activeLetter || it.dataset.letter === activeLetter;
+      const visible = matchQ && matchL;
+      it.style.display = visible ? '' : 'none';
+      if (visible) shown++;
+    });
+    empty.style.display = shown === 0 ? 'block' : 'none';
+  }
+  gs.addEventListener('input', applyFilter);
+  document.querySelectorAll('.gloss-letter').forEach(function(b){
+    b.addEventListener('click', function(){
+      if (b.disabled) return;
+      document.querySelectorAll('.gloss-letter').forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      activeLetter = b.dataset.letter;
+      applyFilter();
+    });
+  });
+}
+
+/* ESSAY MARKER */
+const MARKER_STATE = { ao1Level: null, ao1Pos: null, ao2Level: null, ao2Pos: null };
+
+function renderMarker(paper){
+  const main = document.getElementById('main');
+  const toc = document.getElementById('toc-list');
+  main.innerHTML = '<section class="paper-section active" data-paper="06">' +
+    '<div class="paper-intro practice-intro"><div class="eyebrow">' + paper.code + '</div>' +
+    '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>' +
+    '<div class="marker-grid">' +
+      '<div class="marker-left">' +
+        '<input type="text" class="marker-q-input" id="mk-q" placeholder="The exam question (e.g. \'Natural law provides a reliable method...\')">' +
+        '<textarea id="mk-essay" placeholder="Paste your essay here. The tool will analyse it and update the levels as you type."></textarea>' +
+        '<div class="marker-controls">' +
+          '<button class="primary" id="mk-reanalyse">Re-analyse</button>' +
+          '<button id="mk-clear">Clear</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="marker-rubric" id="mk-rubric">' +
+        '<div class="rubric-empty">Paste an essay on the left (50+ words) to see the OCR levels-of-response mark scheme.</div>' +
+      '</div>' +
+    '</div></section>';
+  toc.innerHTML = '<li><a href="#" onclick="return false">Essay marker</a></li>';
+  const essay = document.getElementById('mk-essay');
+  const q = document.getElementById('mk-q');
+  let timer = null;
+  function debounceAnalyse(){
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(analyse, 250);
+  }
+  essay.addEventListener('input', debounceAnalyse);
+  q.addEventListener('input', debounceAnalyse);
+  document.getElementById('mk-reanalyse').addEventListener('click', analyse);
+  document.getElementById('mk-clear').addEventListener('click', function(){
+    essay.value = '';
+    q.value = '';
+    MARKER_STATE.ao1Level = MARKER_STATE.ao2Level = MARKER_STATE.ao1Pos = MARKER_STATE.ao2Pos = null;
+    analyse();
+  });
+  function analyse(){
+    const detected = detectInEssay(essay.value, q.value);
+    const marks = computeMarks(detected);
+    drawRubric(detected, marks);
+  }
+  analyse();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function detectInEssay(essay, question){
+  if (!essay || essay.trim().length < 50){
+    return { wordCount: 0, paragraphs: 0, scholars: [], technicalTerms: [], counterMoves: [], thesisMarkers: [], verdictMarkers: [], evaluationMarkers: [], hasIntro: false, hasConclusion: false, questionTermsHit: 0, questionTermTotal: 0, topicSentenceFocus: 0, embeddedEvaluation: 0, dialecticalPairs: 0 };
+  }
+  const text = essay.trim();
+  const lower = text.toLowerCase();
+  const wordCount = (text.match(/\S+/g) || []).length;
+  const paragraphs = text.split(/\n\s*\n/).filter(function(p){ return p.trim().length > 30; });
+  const paraCount = paragraphs.length;
+  const scholars = [];
+  const seenSch = {};
+  SCHOLAR_LIST.forEach(function(name){
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('\\b' + escaped + '\\b');
+    if (re.test(text) && !seenSch[name]){ seenSch[name] = 1; scholars.push(name); }
+  });
+  function detectIn(list){
+    return list.filter(function(p){ return lower.indexOf(p.toLowerCase()) >= 0; });
+  }
+  const technicalTerms = detectIn(TECHNICAL_TERMS);
+  const counterMoves = detectIn(COUNTER_MOVES);
+  const thesisMarkers = detectIn(THESIS_MARKERS);
+  const verdictMarkers = detectIn(VERDICT_MARKERS);
+  const evaluationMarkers = detectIn(EVALUATION_MARKERS);
+  const stopwords = ['that','this','these','those','what','which','when','where','with','from','about','only','more','most','than','then','will','have','been','were','being','they','their','there','some','such','also','make','best','because','rather','still','show','prove','should','might','could','would','must','reliable','approach','useful','discuss','assess','evaluate','critically','extent'];
+  const qWords = (question.toLowerCase().match(/[a-z]+/g) || []);
+  const qTerms = [];
+  qWords.forEach(function(w){ if (w.length >= 4 && stopwords.indexOf(w) < 0 && qTerms.indexOf(w) < 0) qTerms.push(w); });
+  const questionTermsHit = qTerms.filter(function(t){ return lower.indexOf(t) >= 0; }).length;
+  const firstPara = paragraphs[0] || '';
+  const lastPara = paragraphs[paraCount - 1] || '';
+  const hasIntro = firstPara.length > 100 && THESIS_MARKERS.some(function(m){ return firstPara.toLowerCase().indexOf(m) >= 0; });
+  const hasConclusion = lastPara.length > 80 && VERDICT_MARKERS.some(function(m){ return lastPara.toLowerCase().indexOf(m) >= 0; });
+  const bodyParas = paragraphs.slice(1, Math.max(1, paraCount - 1));
+  let dialecticalPairs = 0, evaluationParas = 0, topicFocus = 0;
+  bodyParas.forEach(function(p){
+    const pl = p.toLowerCase();
+    if (COUNTER_MOVES.some(function(m){ return pl.indexOf(m) >= 0; }) && p.length > 250) dialecticalPairs++;
+    if (EVALUATION_MARKERS.some(function(m){ return pl.indexOf(m) >= 0; })) evaluationParas++;
+    const firstSentence = (p.match(/^[^.!?]+[.!?]/) || [p.substring(0, 200)])[0].toLowerCase();
+    const qHit = qTerms.filter(function(t){ return firstSentence.indexOf(t) >= 0; }).length;
+    const stance = ['fails','succeeds','works','argues','rejects','supports','undermines','objects','challenges','defends','however','although','strength','weakness','convincing'];
+    const hasStance = stance.some(function(s){ return firstSentence.indexOf(s) >= 0; });
+    if (qHit >= 1 || hasStance) topicFocus++;
+  });
+  const bodyCount = bodyParas.length || 1;
+  return {
+    wordCount: wordCount, paragraphs: paraCount, scholars: scholars,
+    technicalTerms: technicalTerms, counterMoves: counterMoves,
+    thesisMarkers: thesisMarkers, verdictMarkers: verdictMarkers,
+    evaluationMarkers: evaluationMarkers,
+    hasIntro: hasIntro, hasConclusion: hasConclusion,
+    questionTermsHit: questionTermsHit, questionTermTotal: qTerms.length,
+    dialecticalPairs: dialecticalPairs,
+    embeddedEvaluation: evaluationParas / bodyCount,
+    topicSentenceFocus: topicFocus / bodyCount
+  };
+}
+
+function suggestAO1(d){
+  if (d.wordCount === 0) return 1;
+  const breadth = Math.min(4, d.scholars.length);
+  const depth = Math.min(4, d.technicalTerms.length);
+  const len = d.wordCount < 200 ? 0 : d.wordCount < 300 ? 1 : d.wordCount < 450 ? 2 : d.wordCount < 600 ? 3 : 4;
+  const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
+  const tsf = d.topicSentenceFocus;
+  const focus = Math.round((qc * 0.3 + tsf * 0.7) * 4);
+  let total = breadth + depth + len + focus;
+  if (d.wordCount >= 500 && tsf < 0.25) total -= 4;
+  if (total >= 16) return 6;
+  if (total >= 13) return 5;
+  if (total >= 10) return 4;
+  if (total >= 7) return 3;
+  if (total >= 4) return 2;
+  return 1;
+}
+
+function suggestAO2(d){
+  if (d.wordCount === 0) return 1;
+  let structure = 0;
+  if (d.hasIntro) structure++;
+  if (d.thesisMarkers.length >= 2) structure++;
+  if (d.hasConclusion) structure++;
+  if (d.verdictMarkers.length >= 2) structure++;
+  const sustained = Math.round(d.embeddedEvaluation * 5);
+  const dialogue = Math.min(4, d.dialecticalPairs * 2);
+  const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
+  const tsf = d.topicSentenceFocus;
+  const focus = Math.round((qc * 0.3 + tsf * 0.7) * 3);
+  let total = structure + sustained + dialogue + focus;
+  if (d.wordCount >= 500 && tsf < 0.25) total -= 4;
+  let level;
+  if (total >= 16) level = 6;
+  else if (total >= 13) level = 5;
+  else if (total >= 10) level = 4;
+  else if (total >= 7) level = 3;
+  else if (total >= 4) level = 2;
+  else level = 1;
+  const lengthFloor = d.wordCount < 150 ? 1 : d.wordCount < 250 ? 2 : d.wordCount < 350 ? 3 : d.wordCount < 500 ? 4 : d.wordCount < 650 ? 5 : 6;
+  return Math.min(level, lengthFloor);
+}
+
+function markInLevel(level, pos, levels){
+  const r = levels[level].range;
+  const lo = r[0], hi = r[1];
+  const span = hi - lo;
+  if (span === 0) return lo;
+  if (span === 1) return pos <= 1 ? lo : hi;
+  if (span === 2) {
+    if (pos === 0) return lo;
+    if (pos >= 2) return hi;
+    return lo + 1;
+  }
+  return Math.min(hi, Math.max(lo, lo + pos));
+}
+
+function computeMarks(d){
+  const autoAO1 = suggestAO1(d);
+  const autoAO2 = suggestAO2(d);
+  const ao1L = MARKER_STATE.ao1Level != null ? MARKER_STATE.ao1Level : autoAO1;
+  const ao2L = MARKER_STATE.ao2Level != null ? MARKER_STATE.ao2Level : autoAO2;
+  const ao1P = MARKER_STATE.ao1Pos != null ? MARKER_STATE.ao1Pos : 2;
+  const ao2P = MARKER_STATE.ao2Pos != null ? MARKER_STATE.ao2Pos : 2;
+  const ao1Mark = markInLevel(ao1L, ao1P, AO1_LEVELS);
+  const ao2Mark = markInLevel(ao2L, ao2P, AO2_LEVELS);
+  return { ao1L: ao1L, ao2L: ao2L, ao1P: ao1P, ao2P: ao2P, ao1Mark: ao1Mark, ao2Mark: ao2Mark, total: ao1Mark + ao2Mark, autoAO1: autoAO1, autoAO2: autoAO2 };
+}
+
+function getGrade(mark){
+  if (mark >= 34) return 'A*';
+  if (mark >= 29) return 'A';
+  if (mark >= 24) return 'B';
+  if (mark >= 18) return 'C';
+  if (mark >= 13) return 'D';
+  if (mark >= 8) return 'E';
+  return 'U';
+}
+
+function drawRubric(d, m){
+  const rubric = document.getElementById('mk-rubric');
+  if (!d || d.wordCount === 0){
+    rubric.innerHTML = '<div class="rubric-empty">Paste an essay on the left (50+ words) to see the OCR levels-of-response mark scheme.</div>';
+    return;
+  }
+  const grade = getGrade(m.total);
+  const gradeClass = grade === 'A*' ? 'astar' : grade === 'A' ? 'a' : grade === 'B' ? 'b' : grade === 'C' ? 'c' : 'c';
+  function aoBlock(key, aoTitle, mark, level, pos, max, levels, autoLevel){
+    const r = levels[level].range;
+    const positions = ['Bottom of L'+level, 'Just enough', 'Slight inconsistency', 'Top of L'+level];
+    let html = '<div class="lor-section ' + (key === 'ao2' ? 'ao2' : '') + '">' +
+      '<div class="lor-head"><div><span class="lor-ao-label">' + key.toUpperCase() + '</span>' +
+      '<span class="lor-ao-title">' + aoTitle + '</span></div>' +
+      '<div><span class="lor-mark">' + mark + '</span><span class="lor-mark-max">/' + max + '</span></div></div>' +
+      '<div class="lor-row-label">Level</div><div class="lor-levels">';
+    for (let L = 6; L >= 1; L--){
+      const r2 = levels[L].range;
+      html += '<button class="lor-level ' + (L === level ? 'active' : '') + '" data-ao="' + key + '" data-setlevel="' + L + '" title="' + levels[L].label + ': ' + r2[0] + '-' + r2[1] + '">' + L + '</button>';
+    }
+    html += '</div><div class="lor-current"><strong>L' + level + ': ' + levels[level].label + '</strong> &middot; ' + r[0] + '-' + r[1] + ' marks</div>' +
+      '<div class="lor-desc">' + levels[level].desc + '</div>' +
+      '<div class="lor-row-label">Within level</div><div class="lor-positions">';
+    for (let p = 0; p < 4; p++){
+      html += '<button class="lor-pos ' + (p === pos ? 'active' : '') + '" data-ao="' + key + '" data-setpos="' + p + '">' + positions[p] + '</button>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+  let html = '<div class="rubric-grade"><div class="rubric-grade-num ' + gradeClass + '">' + m.total + '<small>/40</small></div>' +
+    '<div class="rubric-grade-band">Grade ' + grade + '</div>' +
+    '<div class="rubric-grade-score">AO1 L' + m.ao1L + ' (' + m.ao1Mark + '/16) &middot; AO2 L' + m.ao2L + ' (' + m.ao2Mark + '/24)</div></div>' +
+    '<div class="lor-explainer">Marked using OCR\'s levels-of-response grid. Auto-suggested levels in italic; click any level to override based on your read of the descriptors.</div>' +
+    aoBlock('ao1', 'Knowledge &amp; Understanding', m.ao1Mark, m.ao1L, m.ao1P, 16, AO1_LEVELS, m.autoAO1) +
+    aoBlock('ao2', 'Analysis &amp; Evaluation', m.ao2Mark, m.ao2L, m.ao2P, 24, AO2_LEVELS, m.autoAO2);
+  if (d.scholars.length){
+    html += '<div class="detected-list"><div class="detected-list-label">Scholars detected (' + d.scholars.length + ')</div><div class="detected-tags">';
+    d.scholars.forEach(function(s){ html += '<span class="detected-tag">' + s + '</span>'; });
+    html += '</div></div>';
+  }
+  if (d.technicalTerms.length){
+    html += '<div class="detected-list"><div class="detected-list-label">Technical vocabulary (' + d.technicalTerms.length + ')</div><div class="detected-tags">';
+    d.technicalTerms.slice(0, 14).forEach(function(t){ html += '<span class="detected-tag tech">' + t + '</span>'; });
+    html += '</div></div>';
+  }
+  rubric.innerHTML = html;
+  rubric.querySelectorAll('.lor-level').forEach(function(b){
+    b.addEventListener('click', function(){
+      const ao = b.dataset.ao;
+      const L = parseInt(b.dataset.setlevel);
+      if (ao === 'ao1'){ MARKER_STATE.ao1Level = L; MARKER_STATE.ao1Pos = null; }
+      else { MARKER_STATE.ao2Level = L; MARKER_STATE.ao2Pos = null; }
+      drawRubric(d, computeMarks(d));
+    });
+  });
+  rubric.querySelectorAll('.lor-pos').forEach(function(b){
+    b.addEventListener('click', function(){
+      const ao = b.dataset.ao;
+      const p = parseInt(b.dataset.setpos);
+      if (ao === 'ao1') MARKER_STATE.ao1Pos = p;
+      else MARKER_STATE.ao2Pos = p;
+      drawRubric(d, computeMarks(d));
+    });
+  });
+}
+
+function setupScrollSpy(selector){
   const links = document.querySelectorAll('.toc a');
-  const items = document.querySelectorAll('.topic');
+  const items = document.querySelectorAll(selector);
   links.forEach(function(link){
     link.addEventListener('click', function(e){
+      const href = link.getAttribute('href');
+      if (!href || !href.startsWith('#') || href === '#') return;
       e.preventDefault();
-      const id = link.getAttribute('href').slice(1);
-      const target = document.getElementById(id);
+      const target = document.getElementById(href.slice(1));
       if (target){
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         links.forEach(function(l){ l.classList.toggle('active', l === link); });
@@ -109,9 +461,16 @@ function buildSearchIndex(){
         paper: p, topicId: t.id, num: i + 1,
         title: stripHtml(t.title),
         body: [stripHtml(t.title), t.spec.join(' '), t.orientation, stripHtml(t.ao1), stripHtml(t.ao2), stripHtml(t.thesis.line), stripHtml(t.thesis.unpacking), t.quote.text + ' ' + t.quote.cite, t.exam, scholarText].join(' ').toLowerCase(),
-        snippet: t.orientation
+        snippet: t.orientation, kind: 'topic'
       });
     });
+  });
+  (CONTENT['04'].sections || []).forEach(function(s, i){
+    searchIndex.push({ paper: '04', topicId: s.id, num: i+1, title: stripHtml(s.title), body: stripHtml(s.html).toLowerCase(), snippet: stripHtml(s.html).slice(0, 200), kind: 'craft' });
+  });
+  const gloss = (CONTENT['05'].sections || []).find(function(s){ return s.kind === 'glossary'; });
+  if (gloss) gloss.items.forEach(function(it){
+    searchIndex.push({ paper: '05', topicId: 'glossary', title: it.term, body: (it.term + ' ' + it.def).toLowerCase(), snippet: it.def, kind: 'gloss' });
   });
 }
 
@@ -128,7 +487,7 @@ function searchQuery(q){
     if (score > 0) scored.push({ item: item, score: score });
   });
   scored.sort(function(a, b){ return b.score - a.score; });
-  return scored.slice(0, 25).map(function(s){ return s.item; });
+  return scored.slice(0, 30).map(function(s){ return s.item; });
 }
 
 function highlightSnippet(text, q){
@@ -161,23 +520,26 @@ function renderSearchResults(q){
     el.innerHTML = '<div class="search-empty">No matches for "' + q + '".</div>';
     return;
   }
-  const byPaper = { '01': [], '02': [], '03': [] };
-  searchResults.forEach(function(r){ byPaper[r.paper].push(r); });
+  const groups = { '01': [], '02': [], '03': [], '04': [], '05': [] };
+  searchResults.forEach(function(r){ if (groups[r.paper]) groups[r.paper].push(r); });
   let html = '';
   let idx = 0;
-  ['01','02','03'].forEach(function(p){
-    if (byPaper[p].length){
-      html += '<div class="sr-section">Paper ' + p + ' &middot; ' + stripHtml(CONTENT[p].title) + '</div>';
-      byPaper[p].forEach(function(r){
-        html += '<div class="sr-item" data-idx="' + idx + '" data-paper="' + r.paper + '" data-target="' + r.topicId + '">' +
-          '<div class="sr-meta">&sect; ' + String(r.num).padStart(2, '0') + '</div>' +
-          '<div class="sr-title">' + r.title + '</div>' +
-          '<div class="sr-snippet">' + highlightSnippet(r.snippet, q) + '</div>' +
-        '</div>';
-        idx++;
-      });
-    }
-  });
+  function addGroup(label, list){
+    if (!list.length) return;
+    html += '<div class="sr-section">' + label + '</div>';
+    list.forEach(function(r){
+      html += '<div class="sr-item" data-idx="' + idx + '" data-paper="' + r.paper + '" data-target="' + r.topicId + '">' +
+        '<div class="sr-meta">&sect; ' + (r.num ? String(r.num).padStart(2, '0') : r.kind) + '</div>' +
+        '<div class="sr-title">' + r.title + '</div>' +
+        '<div class="sr-snippet">' + highlightSnippet(r.snippet, q) + '</div></div>';
+      idx++;
+    });
+  }
+  addGroup('Paper 01 - Philosophy of Religion', groups['01']);
+  addGroup('Paper 02 - Religion & Ethics', groups['02']);
+  addGroup('Paper 03 - Christian Thought', groups['03']);
+  addGroup('Craft', groups['04']);
+  addGroup('Glossary', groups['05']);
   el.innerHTML = html;
   updateSearchSelection();
   el.querySelectorAll('.sr-item').forEach(function(it){
@@ -196,7 +558,7 @@ function navigateToResult(it){
   setTimeout(function(){
     const el = document.getElementById(target);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 80);
+  }, 100);
 }
 
 function updateSearchSelection(){
@@ -231,16 +593,10 @@ document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') closeSearch();
     else if (e.key === 'ArrowDown'){
       e.preventDefault();
-      if (searchResults.length){
-        searchSelectedIdx = Math.min(searchSelectedIdx + 1, searchResults.length - 1);
-        updateSearchSelection();
-      }
+      if (searchResults.length){ searchSelectedIdx = Math.min(searchSelectedIdx + 1, searchResults.length - 1); updateSearchSelection(); }
     } else if (e.key === 'ArrowUp'){
       e.preventDefault();
-      if (searchResults.length){
-        searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0);
-        updateSearchSelection();
-      }
+      if (searchResults.length){ searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0); updateSearchSelection(); }
     } else if (e.key === 'Enter'){
       e.preventDefault();
       const items = document.querySelectorAll('.sr-item');
@@ -251,7 +607,7 @@ document.addEventListener('keydown', function(e){
   if (inField) return;
   if (e.key === '/' && !e.metaKey && !e.ctrlKey){ e.preventDefault(); openSearch(); }
   else if ((e.metaKey || e.ctrlKey) && e.key === 'k'){ e.preventDefault(); openSearch(); }
-  else if (['1','2','3'].indexOf(e.key) >= 0){
+  else if (['1','2','3','4','5','6'].indexOf(e.key) >= 0){
     e.preventDefault();
     const paperId = '0' + e.key;
     const tab = document.querySelector('.paper-tab[data-paper="' + paperId + '"]');

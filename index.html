@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OCR A-Level Religious Studies (H573) · v7 Levels of Response · A★ Notes</title>
+<title>OCR A-Level Religious Studies (H573) · A★ Notes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -37,15 +37,22 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 
 .papers{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:2px solid var(--ink);box-shadow:0 8px 24px -12px rgba(74,19,19,0.25)}
 .papers-inner{max-width:1320px;margin:0 auto;display:flex;overflow-x:auto}
-.paper-tab{flex:1 1 0;min-width:175px;padding:0.75rem 0.95rem 0.7rem;cursor:pointer;border:none;background:transparent;text-align:left;border-right:1px solid var(--rule);font-family:var(--body);color:var(--ink)}
+.paper-tab{flex:1 1 0;min-width:155px;padding:0.7rem 0.85rem 0.65rem;cursor:pointer;border:none;background:transparent;text-align:left;border-right:1px solid var(--rule);font-family:var(--body);color:var(--ink)}
 .paper-tab:hover{background:var(--wash)}
 .paper-tab[aria-selected="true"]{background:var(--ink);color:var(--paper)}
 .paper-tab[aria-selected="true"] .pt-num{color:var(--gold)}
-.pt-num{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--claret);font-weight:600;display:block;margin-bottom:0.2rem}
-.pt-title{font-family:var(--display);font-size:1.1rem;font-weight:500;line-height:1.1}
+.paper-tab.craft-tab[aria-selected="true"] .pt-num{color:var(--ochre)}
+.paper-tab.ref-tab[aria-selected="true"] .pt-num{color:var(--ochre)}
+.paper-tab.practice-tab[aria-selected="true"] .pt-num{color:#7eb87e}
+.pt-num{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--claret);font-weight:600;display:block;margin-bottom:0.2rem}
+.paper-tab.craft-tab .pt-num,.paper-tab.ref-tab .pt-num{color:var(--ochre)}
+.paper-tab.practice-tab .pt-num{color:var(--green)}
+.pt-title{font-family:var(--display);font-size:1.05rem;font-weight:500;line-height:1.1}
 .pt-title em{font-style:italic;color:var(--claret)}
+.paper-tab.craft-tab .pt-title em,.paper-tab.ref-tab .pt-title em{color:var(--ochre)}
+.paper-tab.practice-tab .pt-title em{color:var(--green)}
 .paper-tab[aria-selected="true"] .pt-title em{color:var(--paper-deep)}
-.pt-sub{font-family:var(--ui);font-size:0.62rem;color:var(--muted);margin-top:0.22rem}
+.pt-sub{font-family:var(--ui);font-size:0.6rem;color:var(--muted);margin-top:0.2rem}
 .paper-tab[aria-selected="true"] .pt-sub{color:rgba(245,239,227,0.6)}
 
 .shell{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:240px 1fr;gap:2.5rem;padding:1.8rem 2rem 5rem;position:relative;z-index:1}
@@ -66,10 +73,16 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 
 .paper-intro{margin-bottom:2.5rem;padding-bottom:1.6rem;border-bottom:3px double var(--rule-strong)}
 .paper-intro .eyebrow{font-family:var(--ui);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--claret);font-weight:600;margin-bottom:0.6rem}
+.paper-intro.craft-intro .eyebrow,.paper-intro.ref-intro .eyebrow{color:var(--ochre)}
+.paper-intro.practice-intro .eyebrow{color:var(--green)}
 .paper-intro h1{font-family:var(--display);font-size:clamp(2rem,4.5vw,3.2rem);font-weight:500;line-height:1.05;margin-bottom:0.8rem}
 .paper-intro h1 em{color:var(--claret);font-style:italic}
+.paper-intro.craft-intro h1 em,.paper-intro.ref-intro h1 em{color:var(--ochre);font-style:italic}
+.paper-intro.practice-intro h1 em{color:var(--green);font-style:italic}
 .paper-intro .lede{font-family:var(--display);font-style:italic;font-size:1.18rem;line-height:1.5;color:var(--muted);max-width:62ch}
 .paper-intro .lede::first-letter{font-family:var(--display);font-size:3.8rem;float:left;line-height:0.85;padding-right:0.65rem;padding-top:0.3rem;color:var(--claret);font-weight:500;font-style:normal}
+.paper-intro.craft-intro .lede::first-letter,.paper-intro.ref-intro .lede::first-letter{color:var(--ochre)}
+.paper-intro.practice-intro .lede::first-letter{color:var(--green)}
 
 .topic{margin:3rem 0;scroll-margin-top:96px}
 .topic-header{display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:baseline;padding-bottom:0.8rem;border-bottom:1px solid var(--ink);margin-bottom:1.2rem}
@@ -118,6 +131,113 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .exam-prompt{font-family:var(--display);font-style:italic;background:var(--paper-deep);padding:0.95rem 1rem 0.75rem;border:1px dashed var(--claret);font-size:0.96rem;line-height:1.45;position:relative}
 .exam-prompt::before{content:"ESSAY";position:absolute;top:-0.55rem;left:0.7rem;background:var(--paper);padding:0 0.5rem;font-family:var(--ui);font-style:normal;font-size:0.58rem;letter-spacing:0.25em;color:var(--claret);font-weight:600}
 
+/* CRAFT SECTION */
+.craft-section{margin:3rem 0;scroll-margin-top:96px}
+.craft-head{display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:baseline;padding-bottom:0.8rem;border-bottom:1px solid var(--ink);margin-bottom:1.4rem}
+.craft-num{font-family:var(--mono);font-size:0.8rem;color:var(--ochre);font-weight:500;padding-top:0.55rem}
+.craft-title{font-family:var(--display);font-size:clamp(1.5rem,2.7vw,2rem);font-weight:500;line-height:1.1;color:var(--ink)}
+.craft-title em{color:var(--ochre);font-style:italic}
+.craft-lead{font-family:var(--display);font-style:italic;font-size:1.05rem;line-height:1.55;color:var(--ink);max-width:64ch;margin-bottom:1.2rem;border-left:3px solid var(--ochre);padding-left:0.95rem}
+.craft-note{background:var(--paper-deep);border-left:4px solid var(--ochre);padding:1rem 1.25rem;margin:1.5rem 0;font-style:italic;font-size:0.94rem;line-height:1.55}
+.craft-note strong{color:var(--claret);font-weight:600;font-style:normal}
+.craft-list{list-style:none;padding-left:0;margin:0.5rem 0}
+.craft-list li{position:relative;padding:0.3rem 0 0.3rem 1.2rem;font-size:0.92rem;line-height:1.6}
+.craft-list li::before{content:"§";position:absolute;left:0;top:0.3rem;color:var(--ochre);font-weight:600;font-family:var(--display)}
+.craft-list strong{color:var(--claret-deep);font-weight:600}
+.craft-numlist{padding-left:1.3rem;margin:0.5rem 0}
+.craft-numlist li{margin:0.4rem 0;padding-left:0.3rem;font-size:0.92rem;line-height:1.55}
+.craft-numlist strong{color:var(--claret-deep);font-weight:600}
+
+/* REFERENCE SECTION */
+.ref-section{margin:3rem 0;scroll-margin-top:96px}
+.ref-head{display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:baseline;padding-bottom:0.8rem;border-bottom:1px solid var(--ink);margin-bottom:1.4rem}
+.ref-num{font-family:var(--mono);font-size:0.8rem;color:var(--ochre);font-weight:500;padding-top:0.55rem}
+.ref-title{font-family:var(--display);font-size:clamp(1.5rem,2.7vw,2rem);font-weight:500;line-height:1.1;color:var(--ink)}
+.ref-title em{color:var(--ochre);font-style:italic}
+.ref-desc{font-family:var(--display);font-style:italic;font-size:1.02rem;line-height:1.55;color:var(--muted);max-width:64ch;margin-bottom:1.2rem}
+
+/* GLOSSARY */
+.gloss-filter{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.gloss-search{flex:1;min-width:220px;padding:0.5rem 0.75rem;font-family:var(--display);font-style:italic;font-size:1rem;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);outline:none}
+.gloss-search:focus{border-color:var(--claret)}
+.gloss-letters{display:flex;gap:0.15rem;flex-wrap:wrap;margin-bottom:1rem}
+.gloss-letter{padding:0.25rem 0.55rem;font-family:var(--mono);font-size:0.72rem;font-weight:500;border:1px solid var(--rule);background:var(--wash);color:var(--ink);cursor:pointer;border-radius:2px}
+.gloss-letter:hover{border-color:var(--claret);color:var(--claret)}
+.gloss-letter.active{background:var(--claret);color:var(--paper);border-color:var(--claret)}
+.gloss-letter:disabled{opacity:0.3;cursor:not-allowed}
+.gloss-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0.6rem}
+.gloss-item{background:var(--wash);border:1px solid var(--rule-strong);padding:0.85rem 1rem}
+.gloss-term{font-family:var(--display);font-size:1.1rem;font-weight:600;color:var(--ink);font-style:italic;margin-bottom:0.2rem;display:flex;justify-content:space-between;gap:0.5rem}
+.gloss-term .gp{font-family:var(--mono);font-size:0.62rem;color:var(--ochre);font-weight:500;font-style:normal;background:rgba(168,125,44,0.1);padding:0.1rem 0.35rem;border:1px solid var(--rule);letter-spacing:0.04em}
+.gloss-def{font-size:0.85rem;line-height:1.55;color:var(--ink)}
+.gloss-empty{padding:2rem;text-align:center;color:var(--muted);font-style:italic;background:var(--wash);border:1px dashed var(--rule)}
+
+/* TIMELINE */
+.tl-era{margin-bottom:2rem}
+.tl-era h3{font-family:var(--display);font-size:1.4rem;font-weight:600;color:var(--claret);margin-bottom:0.7rem;padding-bottom:0.35rem;border-bottom:2px solid var(--rule)}
+.tl-thinkers{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0.55rem}
+.tl-thinker{background:var(--wash);border:1px solid var(--rule-strong);padding:0.7rem 0.9rem}
+.tl-name{font-family:var(--display);font-size:1.05rem;font-weight:600;color:var(--ink);line-height:1.15}
+.tl-dates{font-family:var(--mono);font-size:0.7rem;color:var(--ochre);margin-top:0.1rem}
+.tl-contribution{font-size:0.82rem;line-height:1.5;color:var(--ink);margin-top:0.4rem;font-style:italic;font-family:var(--display)}
+
+/* PRACTICE / MARKER */
+.marker-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:1.5rem;margin-top:1rem}
+@media (max-width:900px){.marker-grid{grid-template-columns:1fr}}
+.marker-left{display:flex;flex-direction:column;gap:0.8rem}
+.marker-q-input{padding:0.6rem 0.85rem;font-family:var(--display);font-style:italic;font-size:1rem;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);outline:none}
+.marker-q-input:focus{border-color:var(--claret)}
+.marker-left textarea{width:100%;min-height:380px;padding:1rem 1.15rem;font-family:var(--body);font-size:0.94rem;line-height:1.65;background:var(--paper);border:1px solid var(--rule-strong);color:var(--ink);outline:none;resize:vertical}
+.marker-left textarea:focus{border-color:var(--claret)}
+.marker-controls{display:flex;gap:0.5rem;flex-wrap:wrap}
+.marker-controls button{padding:0.5rem 0.95rem;font-family:var(--ui);font-size:0.78rem;font-weight:600;letter-spacing:0.04em;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink);cursor:pointer;border-radius:2px}
+.marker-controls button:hover{border-color:var(--claret);background:var(--paper-deep)}
+.marker-controls .primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.marker-controls .primary:hover{background:var(--green);border-color:var(--green)}
+.marker-rubric{background:var(--wash);border:1px solid var(--rule-strong);padding:1.1rem 1.25rem;align-self:start;position:sticky;top:96px}
+.rubric-grade{text-align:center;padding:1rem 0.5rem;border-bottom:1px solid var(--rule-strong);margin-bottom:1rem}
+.rubric-grade-num{font-family:var(--display);font-size:2.6rem;font-weight:600;line-height:1;letter-spacing:-0.02em;font-style:italic}
+.rubric-grade-num.astar{color:var(--gold)}
+.rubric-grade-num.a{color:var(--claret)}
+.rubric-grade-num.b{color:var(--ochre)}
+.rubric-grade-num.c{color:var(--muted)}
+.rubric-grade-num small{font-size:1rem;color:var(--muted);font-weight:400;font-style:normal}
+.rubric-grade-band{font-family:var(--ui);font-size:0.74rem;letter-spacing:0.2em;text-transform:uppercase;font-weight:600;color:var(--ink);margin-top:0.3rem}
+.rubric-grade-score{font-family:var(--mono);font-size:0.78rem;color:var(--muted);margin-top:0.4rem}
+.rubric-empty{text-align:center;padding:2rem 1rem;color:var(--muted);font-style:italic;font-size:0.92rem}
+
+.lor-section{padding:0.95rem 0;border-bottom:1px dashed var(--rule-strong)}
+.lor-section:last-of-type{border-bottom:none}
+.lor-head{display:flex;justify-content:space-between;align-items:flex-start;gap:0.8rem;margin-bottom:0.6rem}
+.lor-ao-label{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--claret);font-weight:700;display:block;margin-bottom:0.1rem}
+.lor-section.ao2 .lor-ao-label{color:var(--ochre)}
+.lor-ao-title{font-family:var(--display);font-size:0.95rem;font-weight:500;line-height:1.2}
+.lor-mark{font-family:var(--display);font-size:1.8rem;font-weight:600;font-style:italic}
+.lor-mark-max{font-size:0.8rem;color:var(--muted);font-weight:400;font-style:normal}
+.lor-row-label{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0.4rem 0 0.3rem}
+.lor-levels{display:flex;gap:0.2rem;flex-wrap:wrap}
+.lor-level{width:30px;height:30px;display:grid;place-items:center;font-family:var(--mono);font-size:0.85rem;font-weight:600;background:var(--wash);color:var(--ink);border:1px solid var(--rule-strong);cursor:pointer;border-radius:2px}
+.lor-level:hover{border-color:var(--claret);background:var(--paper-deep)}
+.lor-level.active{background:var(--ink);color:var(--gold);border-color:var(--ink)}
+.lor-positions{display:flex;gap:0.2rem;flex-wrap:wrap;margin-top:0.3rem}
+.lor-pos{padding:0.32rem 0.5rem;font-family:var(--ui);font-size:0.6rem;font-weight:500;background:var(--wash);color:var(--ink);border:1px solid var(--rule-strong);cursor:pointer;border-radius:2px;flex:1;min-width:70px;text-align:center}
+.lor-pos:hover{border-color:var(--ochre);background:var(--paper-deep)}
+.lor-pos.active{background:var(--ochre);color:var(--paper);border-color:var(--ochre)}
+.lor-current{font-family:var(--display);font-size:0.92rem;line-height:1.4;padding:0.5rem 0.7rem;background:var(--paper);border:1px solid var(--rule);margin:0.4rem 0 0.3rem}
+.lor-current strong{color:var(--claret);font-style:italic}
+.lor-section.ao2 .lor-current strong{color:var(--ochre)}
+.lor-desc{font-size:0.8rem;line-height:1.55;padding:0.5rem 0.7rem;background:var(--wash);border-left:3px solid var(--claret);margin:0.3rem 0}
+.lor-section.ao2 .lor-desc{border-left-color:var(--ochre)}
+
+.detected-list{margin-top:0.8rem;padding-top:0.8rem;border-top:1px dashed var(--rule-strong)}
+.detected-list-label{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.4rem}
+.detected-tags{display:flex;flex-wrap:wrap;gap:0.25rem}
+.detected-tag{padding:0.15rem 0.45rem;font-family:var(--ui);font-size:0.65rem;font-weight:500;background:rgba(61,107,61,0.12);border:1px solid rgba(61,107,61,0.3);color:var(--green);border-radius:2px}
+.detected-tag.tech{background:rgba(168,125,44,0.12);border-color:rgba(168,125,44,0.3);color:var(--ochre)}
+
+.lor-explainer{font-family:var(--display);font-style:italic;font-size:0.84rem;line-height:1.55;color:var(--muted);padding:0.6rem 0.85rem;background:var(--paper);border-left:3px solid var(--ochre);margin-bottom:1rem}
+
+/* SEARCH */
 .search-modal{position:fixed;inset:0;background:rgba(26,20,18,0.75);z-index:200;display:none;padding:5vh 1rem 1rem;backdrop-filter:blur(6px)}
 .search-modal.active{display:flex;flex-direction:column;align-items:center}
 .search-box{width:100%;max-width:680px;background:var(--paper);border:1px solid var(--rule-strong);box-shadow:0 20px 60px -10px rgba(0,0,0,0.5);display:flex;flex-direction:column;max-height:80vh;overflow:hidden}
@@ -156,7 +276,7 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
     <div>
       <span class="brand-eyebrow">OCR H573 &middot; A-Level Religious Studies</span>
       <h1 class="brand-title">Philosophy, Ethics <em>&amp;</em> Christian Thought</h1>
-      <p class="brand-sub">A&#9733; revision notes covering 30 topics across the three OCR H573 papers: scholar banks, key texts, thesis lines, exam questions, and synoptic links.</p>
+      <p class="brand-sub">A&#9733; revision notes, exam craft, glossary, scholar timeline and OCR-aligned essay marker.</p>
     </div>
     <div class="masthead-actions">
       <button class="search-trigger" id="open-search" aria-label="Search"><span>&#8980; Search</span><kbd>/</kbd></button>
@@ -182,6 +302,21 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
       <span class="pt-title">Christian <em>Thought</em></span>
       <span class="pt-sub">12 topics</span>
     </button>
+    <button class="paper-tab craft-tab" role="tab" data-paper="04" aria-selected="false">
+      <span class="pt-num">&#9733; Craft</span>
+      <span class="pt-title">Essay <em>Method</em></span>
+      <span class="pt-sub">8 sections</span>
+    </button>
+    <button class="paper-tab ref-tab" role="tab" data-paper="05" aria-selected="false">
+      <span class="pt-num">Reference</span>
+      <span class="pt-title">Glossary <em>&amp;</em> Timeline</span>
+      <span class="pt-sub">2 sections</span>
+    </button>
+    <button class="paper-tab practice-tab" role="tab" data-paper="06" aria-selected="false">
+      <span class="pt-num">&#9658; Marker</span>
+      <span class="pt-title">Essay <em>Self-Mark</em></span>
+      <span class="pt-sub">OCR levels</span>
+    </button>
   </div>
 </nav>
 
@@ -205,10 +340,11 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
 </div>
 
 <footer>
-  <p><b>OCR H573</b> &middot; A-level Religious Studies revision &middot; Philosophy of Religion &middot; Religion &amp; Ethics &middot; Christian Thought &middot; Press <kbd>/</kbd> to search, <kbd>1</kbd>-<kbd>3</kbd> for tabs</p>
+  <p><b>OCR H573</b> &middot; 30 topics &middot; 8 craft sections &middot; glossary &middot; scholar timeline &middot; OCR-aligned essay marker (AO1 L1-6, AO2 L1-6) &middot; Press <kbd>/</kbd> to search</p>
 </footer>
 
 <script src="content.js"></script>
+<script src="extras.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
