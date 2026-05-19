@@ -91,6 +91,38 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .topic-title-block h2 em{color:var(--claret);font-style:italic}
 .spec-tags{display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.5rem}
 .spec-tag{display:inline-block;padding:0.18rem 0.5rem;background:var(--paper-deep);color:var(--ink);font-family:var(--ui);font-size:0.62rem;letter-spacing:0.04em;border:1px solid var(--rule)}
+.topic-header{display:grid;grid-template-columns:auto 1fr auto;gap:1rem}
+.topic-actions{display:flex;flex-direction:column;gap:0.32rem;align-items:flex-end;padding-top:0.3rem}
+.t-action{padding:0.32rem 0.55rem;font-family:var(--ui);font-size:0.66rem;font-weight:500;letter-spacing:0.04em;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink);cursor:pointer;border-radius:2px;display:flex;align-items:center;gap:0.32rem;white-space:nowrap;transition:all 0.15s}
+.t-action:hover{border-color:var(--claret);background:var(--paper-deep)}
+.t-action.studied{background:var(--green);color:var(--paper);border-color:var(--green)}
+.t-action.bookmarked{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.t-action .ico{font-family:var(--display);font-style:italic;font-size:0.85rem;line-height:1}
+@media (max-width:680px){.topic-header{grid-template-columns:auto 1fr}.topic-actions{grid-column:1/-1;flex-direction:row;justify-content:flex-end;padding-top:0}}
+
+.toc a{position:relative}
+.toc-pip{position:absolute;right:0.3rem;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:transparent}
+.toc-pip.studied{background:var(--green)}
+.toc-pip.bookmarked{background:var(--gold)}
+.toc-progress{margin-top:1.2rem;padding:0.75rem 0.6rem 0.6rem;background:var(--wash);border:1px solid var(--rule)}
+.toc-progress-label{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;margin-bottom:0.4rem}
+.toc-progress-label b{color:var(--claret);font-weight:600}
+.toc-progress-bar{height:5px;background:var(--paper-deep);border-radius:3px;overflow:hidden}
+.toc-progress-fill{height:100%;background:linear-gradient(90deg,var(--claret),var(--ochre));transition:width 0.3s}
+.toc-progress-reset{font-family:var(--ui);font-size:0.58rem;letter-spacing:0.1em;color:var(--muted);background:transparent;border:none;padding:0.3rem 0;cursor:pointer;margin-top:0.3rem;text-decoration:underline;text-decoration-style:dotted;display:block}
+.toc-progress-reset:hover{color:var(--claret)}
+
+.thesis-actions{display:flex;justify-content:flex-end;margin-top:0.6rem;padding-top:0.5rem;border-top:1px solid rgba(245,239,227,0.15)}
+.thesis-reveal{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;background:rgba(196,137,47,0.2);color:var(--gold);padding:0.25rem 0.6rem;border:1px solid rgba(196,137,47,0.4);border-radius:2px;cursor:pointer;font-weight:600}
+.thesis-reveal:hover{background:var(--gold);color:var(--ink)}
+.thesis.hidden .thesis-line,.thesis.hidden .thesis-unpacking{filter:blur(8px);user-select:none;transition:filter 0.2s}
+.thesis.hidden .thesis-line::after{content:" — click 'Reveal' to test yourself";filter:none;color:var(--gold);font-family:var(--ui);font-style:normal;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;margin-left:1rem;display:none}
+.thesis-prompt{font-family:var(--ui);font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);margin-top:0.4rem;display:none}
+.thesis.hidden .thesis-prompt{display:block}
+
+.toast-container{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:0.4rem;align-items:center;pointer-events:none}
+.toast{background:var(--ink);color:var(--paper);padding:0.55rem 1rem;font-family:var(--ui);font-size:0.78rem;font-weight:500;border-radius:2px;border-left:3px solid var(--gold);box-shadow:0 6px 20px -4px rgba(0,0,0,0.4)}
+.toast.success{border-left-color:var(--green)}
 
 .orientation{font-family:var(--display);font-style:italic;font-size:1.1rem;line-height:1.5;color:var(--ink);max-width:64ch;border-left:3px solid var(--claret);padding:0.2rem 0 0.2rem 1rem;margin:0.3rem 0 1.3rem 0.3rem}
 
@@ -324,6 +356,11 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
   <aside class="toc" aria-label="Topic contents">
     <div class="toc-heading">Contents</div>
     <ol id="toc-list"></ol>
+    <div class="toc-progress" id="toc-progress" style="display:none">
+      <div class="toc-progress-label"><span>Paper progress</span><span id="prog-text"><b>0</b>/0</span></div>
+      <div class="toc-progress-bar"><div class="toc-progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <button class="toc-progress-reset" id="prog-reset">Reset this paper</button>
+    </div>
   </aside>
   <main class="main" id="main"><div class="app-loading">Loading revision content&hellip;</div></main>
 </div>
@@ -339,8 +376,11 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
   </div>
 </div>
 
+<div class="toast-container" id="toast-container"></div>
+
 <footer>
-  <p><b>OCR H573</b> &middot; 30 topics &middot; 8 craft sections &middot; glossary &middot; scholar timeline &middot; OCR-aligned essay marker (AO1 L1-6, AO2 L1-6) &middot; Press <kbd>/</kbd> to search</p>
+  <p><b>OCR H573</b> &middot; 30 topics &middot; click any scholar to see all their appearances &middot; tick off as you go &middot; OCR-aligned essay marker</p>
+  <p style="margin-top:0.4rem">Shortcuts: <kbd>/</kbd> search &middot; <kbd>1</kbd>-<kbd>6</kbd> tabs &middot; <kbd>j</kbd>/<kbd>k</kbd> next/prev topic &middot; <kbd>h</kbd> tick current topic studied</p>
 </footer>
 
 <div class="search-modal" id="scholar-modal" role="dialog" aria-label="Scholar">

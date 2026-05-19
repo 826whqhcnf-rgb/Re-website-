@@ -1,5 +1,34 @@
 /* OCR H573 revision site — app logic */
 
+/* PROGRESS STATE (localStorage) */
+const STORAGE_KEY = 'h573_progress_v1';
+const DEFAULT_STATE = { studied: {}, bookmarks: {}, hiddenThesis: false };
+let STATE = JSON.parse(JSON.stringify(DEFAULT_STATE));
+try {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw){
+    const parsed = JSON.parse(raw);
+    STATE = Object.assign({}, DEFAULT_STATE, parsed);
+    STATE.studied = STATE.studied || {};
+    STATE.bookmarks = STATE.bookmarks || {};
+  }
+} catch(e){}
+function saveState(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); } catch(e){}
+}
+function topicKey(paperId, topicId){ return paperId + ':' + topicId; }
+
+/* TOAST */
+function toast(msg, type){
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || '');
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(function(){ el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 1600);
+  setTimeout(function(){ el.remove(); }, 2000);
+}
+
 function stripHtml(s){ return (s || '').replace(/<[^>]+>/g, ''); }
 
 /* SCHOLAR INDEX — built from all topics, maps surname → appearances */
@@ -71,18 +100,31 @@ function renderTopicPaper(paperId, paper){
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
   paper.topics.forEach(function(t, i){
     const num = String(i + 1).padStart(2, '0');
+    const tkey = topicKey(paperId, t.id);
+    const isStudied = !!STATE.studied[tkey];
+    const isBookmarked = !!STATE.bookmarks[tkey];
+    const hiddenCls = STATE.hiddenThesis ? ' hidden' : '';
     html += '<article class="topic" id="' + t.id + '">' +
       '<header class="topic-header"><div class="topic-num">&sect; ' + num + '</div>' +
       '<div class="topic-title-block"><h2>' + t.title + '</h2>' +
-      '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div></div></header>' +
+      '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div></div>' +
+      '<div class="topic-actions">' +
+        '<button class="t-action ' + (isStudied ? 'studied' : '') + '" data-action="studied" data-key="' + tkey + '"><span class="ico">✓</span><span>' + (isStudied ? 'Studied' : 'Mark studied') + '</span></button>' +
+        '<button class="t-action ' + (isBookmarked ? 'bookmarked' : '') + '" data-action="bookmark" data-key="' + tkey + '"><span class="ico">★</span><span>' + (isBookmarked ? 'Bookmarked' : 'Bookmark') + '</span></button>' +
+      '</div>' +
+      '</header>' +
       '<p class="orientation">' + t.orientation + '</p>' +
       '<div class="ao-grid">' +
         '<div class="ao"><div class="ao-label">AO1 <small>Knowledge &amp; Understanding</small></div>' + t.ao1 + '</div>' +
         '<div class="ao"><div class="ao-label">AO2 <small>Evaluation &amp; Argument</small></div>' + t.ao2 + '</div>' +
       '</div>' +
-      '<div class="thesis"><div class="thesis-label">The A&#9733; line &middot; commit to this</div>' +
+      '<div class="thesis' + hiddenCls + '">' +
+      '<div class="thesis-label">The A&#9733; line &middot; commit to this</div>' +
       '<div class="thesis-line">' + t.thesis.line + '</div>' +
-      '<div class="thesis-unpacking">' + t.thesis.unpacking + '</div></div>';
+      '<div class="thesis-unpacking">' + t.thesis.unpacking + '</div>' +
+      '<div class="thesis-prompt">Test yourself first &mdash; what verdict would you commit to?</div>' +
+      '<div class="thesis-actions"><button class="thesis-reveal" data-action="toggle-thesis">' + (STATE.hiddenThesis ? 'Reveal A&#9733; line' : 'Hide for recall') + '</button></div>' +
+      '</div>';
     if (t.scholars && t.scholars.length){
       html += '<div class="scholar-list"><div class="scholar-list-label">Scholar bank &middot; <small style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-style:italic;font-family:var(--body)">click a name to see where else they appear</small></div>';
       t.scholars.forEach(function(s){
@@ -97,11 +139,68 @@ function renderTopicPaper(paperId, paper){
   html += '</section>';
   main.innerHTML = html;
   toc.innerHTML = paper.topics.map(function(t){
-    return '<li><a href="#' + t.id + '">' + stripHtml(t.title) + '</a></li>';
+    const tk = topicKey(paperId, t.id);
+    const pip = STATE.studied[tk] ? '<span class="toc-pip studied"></span>' : (STATE.bookmarks[tk] ? '<span class="toc-pip bookmarked"></span>' : '');
+    return '<li><a href="#' + t.id + '">' + stripHtml(t.title) + pip + '</a></li>';
   }).join('');
+  updateProgressBar(paperId);
   setupScrollSpy('.topic');
+  wireTopicActions(paperId);
   wireScholarClicks();
   window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function updateProgressBar(paperId){
+  const paper = CONTENT[paperId];
+  const wrap = document.getElementById('toc-progress');
+  if (!paper.topics){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const total = paper.topics.length;
+  const done = paper.topics.filter(function(t){ return STATE.studied[topicKey(paperId, t.id)]; }).length;
+  document.getElementById('prog-text').innerHTML = '<b>' + done + '</b>/' + total;
+  document.getElementById('prog-fill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  document.getElementById('prog-reset').onclick = function(){
+    if (!confirm('Reset studied/bookmark progress for Paper ' + paperId + '?')) return;
+    paper.topics.forEach(function(t){
+      const k = topicKey(paperId, t.id);
+      delete STATE.studied[k];
+      delete STATE.bookmarks[k];
+    });
+    saveState();
+    toast('Paper ' + paperId + ' progress reset');
+    renderPaper(paperId);
+  };
+}
+
+function wireTopicActions(paperId){
+  document.querySelectorAll('.t-action').forEach(function(b){
+    b.addEventListener('click', function(){
+      const action = b.dataset.action;
+      const key = b.dataset.key;
+      const store = action === 'studied' ? STATE.studied : STATE.bookmarks;
+      if (store[key]){
+        delete store[key];
+        toast(action === 'studied' ? 'Removed from studied' : 'Bookmark removed');
+      } else {
+        store[key] = Date.now();
+        toast(action === 'studied' ? 'Marked as studied' : 'Bookmarked', 'success');
+      }
+      saveState();
+      const scrollY = window.scrollY;
+      renderPaper(paperId);
+      window.scrollTo(0, scrollY);
+    });
+  });
+  document.querySelectorAll('.thesis-reveal').forEach(function(b){
+    b.addEventListener('click', function(){
+      STATE.hiddenThesis = !STATE.hiddenThesis;
+      saveState();
+      const scrollY = window.scrollY;
+      renderPaper(paperId);
+      window.scrollTo(0, scrollY);
+      toast(STATE.hiddenThesis ? 'Thesis lines hidden for recall' : 'Thesis lines revealed');
+    });
+  });
 }
 
 function wireScholarClicks(){
@@ -117,6 +216,7 @@ function wireScholarClicks(){
 function renderCraft(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
+  document.getElementById('toc-progress').style.display = 'none';
   let html = '<section class="paper-section active" data-paper="04">' +
     '<div class="paper-intro craft-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
@@ -138,6 +238,7 @@ function renderCraft(paper){
 function renderReference(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
+  document.getElementById('toc-progress').style.display = 'none';
   let html = '<section class="paper-section active" data-paper="05">' +
     '<div class="paper-intro ref-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>';
@@ -231,6 +332,7 @@ const MARKER_STATE = { ao1Level: null, ao1Pos: null, ao2Level: null, ao2Pos: nul
 function renderMarker(paper){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
+  document.getElementById('toc-progress').style.display = 'none';
   main.innerHTML = '<section class="paper-section active" data-paper="06">' +
     '<div class="paper-intro practice-intro"><div class="eyebrow">' + paper.code + '</div>' +
     '<h1>' + paper.title + '</h1><p class="lede">' + paper.intro + '</p></div>' +
@@ -685,6 +787,38 @@ document.addEventListener('keydown', function(e){
     const paperId = '0' + e.key;
     const tab = document.querySelector('.paper-tab[data-paper="' + paperId + '"]');
     if (tab) tab.click();
+  }
+  else if (e.key === 'j' || e.key === 'k'){
+    const items = document.querySelectorAll('.topic, .craft-section, .ref-section');
+    if (!items.length) return;
+    const scrollY = window.scrollY;
+    let targetIdx = -1;
+    if (e.key === 'j'){
+      for (let i = 0; i < items.length; i++){
+        if (items[i].getBoundingClientRect().top + window.scrollY > scrollY + 100){ targetIdx = i; break; }
+      }
+    } else {
+      for (let i = items.length - 1; i >= 0; i--){
+        if (items[i].getBoundingClientRect().top + window.scrollY < scrollY - 5){ targetIdx = i; break; }
+      }
+    }
+    if (targetIdx >= 0){
+      e.preventDefault();
+      items[targetIdx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  else if (e.key === 'h'){
+    /* mark current visible topic as studied */
+    const items = document.querySelectorAll('.topic');
+    let visible = null;
+    items.forEach(function(it){
+      const r = it.getBoundingClientRect();
+      if (r.top >= -50 && r.top < window.innerHeight / 2 && !visible) visible = it;
+    });
+    if (visible){
+      const btn = visible.querySelector('.t-action[data-action="studied"]');
+      if (btn) btn.click();
+    }
   }
 });
 
