@@ -2,6 +2,58 @@
 
 function stripHtml(s){ return (s || '').replace(/<[^>]+>/g, ''); }
 
+/* SCHOLAR INDEX — built from all topics, maps surname → appearances */
+const SCHOLAR_INDEX = {};
+function canonicalScholarKey(name){
+  return name.replace(/\([^)]*\)/g, '').trim().toLowerCase();
+}
+function buildScholarIndex(){
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){
+      (t.scholars || []).forEach(function(s){
+        const key = canonicalScholarKey(s.name);
+        if (!SCHOLAR_INDEX[key]){
+          SCHOLAR_INDEX[key] = { displayName: s.name, appearances: [] };
+        }
+        SCHOLAR_INDEX[key].appearances.push({
+          paper: p,
+          topicId: t.id,
+          topicTitle: stripHtml(t.title),
+          position: s.pos
+        });
+      });
+    });
+  });
+}
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function openScholar(key){
+  const entry = SCHOLAR_INDEX[key];
+  if (!entry) return;
+  document.getElementById('scholar-modal-name').textContent = entry.displayName;
+  document.getElementById('scholar-modal-sub').textContent = entry.appearances.length + ' appearance' + (entry.appearances.length === 1 ? '' : 's') + ' across the specification';
+  const groups = { '01': [], '02': [], '03': [] };
+  entry.appearances.forEach(function(a){ groups[a.paper].push(a); });
+  let html = '';
+  ['01','02','03'].forEach(function(p){
+    if (!groups[p].length) return;
+    html += '<div class="sr-section">Paper ' + p + ' &middot; ' + stripHtml(CONTENT[p].title) + '</div>';
+    groups[p].forEach(function(a){
+      html += '<div class="sr-item" data-paper="' + a.paper + '" data-target="' + a.topicId + '">' +
+        '<div class="sr-meta">' + a.topicTitle + '</div>' +
+        '<div class="sr-snippet" style="margin-top:0.3rem;color:var(--ink);font-size:0.88rem;line-height:1.55">' + escapeHtml(a.position) + '</div></div>';
+    });
+  });
+  document.getElementById('scholar-modal-body').innerHTML = html;
+  document.querySelectorAll('#scholar-modal-body .sr-item').forEach(function(it){
+    it.addEventListener('click', function(){
+      closeScholar();
+      navigateToResult(it);
+    });
+  });
+  document.getElementById('scholar-modal').classList.add('active');
+}
+function closeScholar(){ document.getElementById('scholar-modal').classList.remove('active'); }
+
 function renderPaper(paperId){
   const paper = CONTENT[paperId];
   if (!paper) return;
@@ -32,9 +84,10 @@ function renderTopicPaper(paperId, paper){
       '<div class="thesis-line">' + t.thesis.line + '</div>' +
       '<div class="thesis-unpacking">' + t.thesis.unpacking + '</div></div>';
     if (t.scholars && t.scholars.length){
-      html += '<div class="scholar-list"><div class="scholar-list-label">Scholar bank</div>';
+      html += '<div class="scholar-list"><div class="scholar-list-label">Scholar bank &middot; <small style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-style:italic;font-family:var(--body)">click a name to see where else they appear</small></div>';
       t.scholars.forEach(function(s){
-        html += '<div class="scholar-item"><span class="scholar-name">' + s.name + '</span><span>' + s.pos + '</span></div>';
+        const key = canonicalScholarKey(s.name);
+        html += '<div class="scholar-item"><span class="scholar-name scholar-clickable" data-scholar-key="' + key + '">' + s.name + '</span><span>' + s.pos + '</span></div>';
       });
       html += '</div>';
     }
@@ -47,7 +100,18 @@ function renderTopicPaper(paperId, paper){
     return '<li><a href="#' + t.id + '">' + stripHtml(t.title) + '</a></li>';
   }).join('');
   setupScrollSpy('.topic');
+  wireScholarClicks();
   window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function wireScholarClicks(){
+  document.querySelectorAll('.scholar-clickable').forEach(function(el){
+    el.style.cursor = 'pointer';
+    el.style.textDecoration = 'underline';
+    el.style.textDecorationStyle = 'dotted';
+    el.style.textUnderlineOffset = '3px';
+    el.addEventListener('click', function(){ openScholar(el.dataset.scholarKey); });
+  });
 }
 
 function renderCraft(paper){
@@ -580,6 +644,10 @@ function closeSearch(){
 
 document.getElementById('open-search').addEventListener('click', openSearch);
 document.getElementById('search-close').addEventListener('click', closeSearch);
+document.getElementById('scholar-close').addEventListener('click', closeScholar);
+document.getElementById('scholar-modal').addEventListener('click', function(e){
+  if (e.target.id === 'scholar-modal') closeScholar();
+});
 document.getElementById('search-input').addEventListener('input', function(e){ renderSearchResults(e.target.value); });
 document.getElementById('search-modal').addEventListener('click', function(e){
   if (e.target.id === 'search-modal') closeSearch();
@@ -588,6 +656,11 @@ document.getElementById('search-modal').addEventListener('click', function(e){
 document.addEventListener('keydown', function(e){
   const inField = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
   const modal = document.getElementById('search-modal');
+  const scholarModal = document.getElementById('scholar-modal');
+  if (scholarModal.classList.contains('active')){
+    if (e.key === 'Escape') closeScholar();
+    return;
+  }
   const modalOpen = modal.classList.contains('active');
   if (modalOpen){
     if (e.key === 'Escape') closeSearch();
@@ -615,5 +688,6 @@ document.addEventListener('keydown', function(e){
   }
 });
 
+buildScholarIndex();
 buildSearchIndex();
 renderPaper('01');
