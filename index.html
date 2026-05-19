@@ -191,6 +191,101 @@ body.filter-unstudied .toc a.is-studied{display:none}
   body.print-bookmarked .topic:not(.is-bookmarked){display:none!important}
 }
 
+/* DARK MODE */
+body.dark{
+  --ink:#ede5d3; --paper:#1a1614; --paper-deep:#2a221d; --wash:#221c18;
+  --claret:#d97777; --claret-deep:#e89a9a;
+  --ochre:#d4a458; --gold:#f0c060; --gold-wash:#5a4a1f;
+  --rule:rgba(237,229,211,0.16); --rule-strong:rgba(237,229,211,0.34);
+  --muted:#8a8170; --green:#7eb87e;
+}
+body.dark::before{opacity:0.15}
+.theme-toggle{padding:0.5rem 0.7rem;border:1px solid var(--rule-strong);font-family:var(--ui);font-size:0.74rem;color:var(--muted);background:var(--wash);border-radius:2px;font-weight:500;cursor:pointer}
+.theme-toggle:hover{border-color:var(--claret);color:var(--ink);background:var(--paper-deep)}
+
+/* DUE-TODAY / SPACED REPETITION */
+.topic-meta-row{display:flex;gap:0.5rem;font-family:var(--ui);font-size:0.62rem;letter-spacing:0.05em;color:var(--muted);margin-top:0.4rem;align-items:center;flex-wrap:wrap}
+.topic-due-pill{padding:0.15rem 0.45rem;border-radius:2px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;font-size:0.58rem}
+.topic-due-pill.fresh{background:rgba(61,107,61,0.12);color:var(--green);border:1px solid rgba(61,107,61,0.3)}
+.topic-due-pill.due{background:rgba(168,125,44,0.18);color:var(--ochre);border:1px solid rgba(168,125,44,0.4)}
+.topic-due-pill.overdue{background:rgba(107,29,29,0.15);color:var(--claret);border:1px solid rgba(107,29,29,0.4)}
+.topic-due-pill.never{background:var(--paper-deep);color:var(--muted);border:1px solid var(--rule)}
+
+/* STREAK / DAILY TARGET */
+.streak-display{display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.6rem;background:var(--wash);border:1px solid var(--rule);margin-top:0.4rem;font-family:var(--ui);font-size:0.65rem;justify-content:space-between}
+.streak-num{font-family:var(--display);font-style:italic;font-size:1.15rem;font-weight:600;color:var(--gold);line-height:1}
+.streak-label{font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+
+/* TIMED ESSAY */
+.timed-bar{position:sticky;top:80px;z-index:15;background:var(--ink);color:var(--paper);padding:0.7rem 1.2rem;display:grid;grid-template-columns:auto 1fr auto auto;gap:1rem;align-items:center;margin-bottom:1.2rem;border-radius:2px}
+body.dark .timed-bar{background:var(--paper-deep);border:1px solid var(--rule-strong)}
+.timed-bar.warning{background:linear-gradient(135deg,var(--ink) 0%,#5a1818 100%)}
+.timed-bar.expired{background:#5a1818}
+.timer-display{font-family:var(--mono);font-size:1.4rem;font-weight:600;color:var(--gold);font-variant-numeric:tabular-nums}
+.timed-bar.warning .timer-display{color:#f4e2ae;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.timer-progress-track{height:5px;background:rgba(245,239,227,0.15);border-radius:3px;overflow:hidden}
+.timer-progress-fill{height:100%;background:var(--gold);transition:width 1s linear}
+.word-counter{font-family:var(--mono);font-size:0.85rem;color:rgba(245,239,227,0.85);text-align:right;line-height:1.2;font-variant-numeric:tabular-nums}
+.word-counter b{color:var(--gold);font-weight:600;font-size:1.05rem}
+.word-counter small{display:block;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,239,227,0.5)}
+.timed-stop{padding:0.4rem 0.85rem;font-family:var(--ui);font-size:0.72rem;font-weight:600;background:var(--gold);color:var(--ink);border:none;border-radius:2px;cursor:pointer}
+.timed-stop:hover{background:#e6a93f}
+.timed-question{background:var(--paper-deep);border:2px solid var(--claret);padding:1rem 1.3rem;margin-bottom:1.2rem;font-family:var(--display);font-style:italic;font-size:1.18rem;line-height:1.4;color:var(--ink);position:relative}
+.timed-question::before{content:"QUESTION";position:absolute;top:-0.55rem;left:1rem;background:var(--paper);padding:0 0.55rem;font-family:var(--ui);font-style:normal;font-size:0.6rem;letter-spacing:0.25em;color:var(--claret);font-weight:600}
+.timed-plan,.timed-essay-wrap{background:var(--wash);border:1px solid var(--rule-strong);padding:1rem 1.2rem;margin-bottom:1rem}
+.timed-plan-label,.timed-essay-label{font-family:var(--ui);font-size:0.64rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--claret);font-weight:600;margin-bottom:0.5rem}
+.timed-plan-label small,.timed-essay-label small{font-family:var(--body);font-style:italic;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.72rem;font-weight:400;margin-left:0.4rem}
+.timed-plan textarea,.timed-essay-wrap textarea{width:100%;padding:0.7rem 0.85rem;background:var(--paper);border:1px solid var(--rule);color:var(--ink);outline:none;resize:vertical;font-family:var(--display);font-style:italic;font-size:0.96rem;line-height:1.55}
+.timed-essay-wrap textarea{min-height:500px;font-family:var(--body);font-style:normal;font-size:1rem;line-height:1.7}
+.timed-plan textarea{min-height:85px}
+
+/* QUIZ */
+.quiz-body{padding:1.5rem;color:var(--ink)}
+.quiz-prompt{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.5rem;text-align:center}
+.quiz-position{font-family:var(--display);font-style:italic;font-size:1.1rem;line-height:1.45;text-align:center;padding:1rem 1.2rem;background:var(--wash);border:1px solid var(--rule-strong);margin-bottom:1.2rem}
+.quiz-options{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
+@media (max-width:600px){.quiz-options{grid-template-columns:1fr}}
+.quiz-option{padding:0.6rem 0.85rem;font-family:var(--display);font-weight:600;font-style:italic;font-size:1rem;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);cursor:pointer;border-radius:2px;text-align:left;transition:all 0.15s}
+.quiz-option:hover{border-color:var(--claret);background:var(--paper-deep)}
+.quiz-option.correct{background:var(--green);color:var(--paper);border-color:var(--green)}
+.quiz-option.wrong{background:rgba(107,29,29,0.15);color:var(--claret);border-color:var(--claret)}
+.quiz-option.disabled{cursor:default}
+.quiz-feedback{margin-top:1rem;padding:0.7rem 1rem;font-family:var(--body);font-size:0.9rem;line-height:1.55;display:none}
+.quiz-feedback.show{display:block}
+.quiz-feedback.right{background:rgba(61,107,61,0.1);border-left:3px solid var(--green)}
+.quiz-feedback.wrong{background:rgba(107,29,29,0.08);border-left:3px solid var(--claret)}
+.quiz-score{font-family:var(--mono);font-size:0.75rem;color:var(--muted);text-align:center;padding:0.5rem;background:var(--wash);border-top:1px solid var(--rule)}
+
+/* PAST PAPERS */
+.pp-body{padding:1.3rem 1.5rem;max-height:60vh;overflow-y:auto;color:var(--ink)}
+.pp-filter{display:flex;gap:0.3rem;margin-bottom:1rem;flex-wrap:wrap}
+.pp-filter button{padding:0.3rem 0.6rem;font-family:var(--ui);font-size:0.66rem;font-weight:500;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);cursor:pointer;border-radius:2px}
+.pp-filter button.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.pp-topic{margin-bottom:1.2rem}
+.pp-topic-head{font-family:var(--display);font-size:1.05rem;font-weight:600;color:var(--claret);margin-bottom:0.4rem;padding-bottom:0.25rem;border-bottom:1px dashed var(--rule)}
+.pp-topic-head span{font-family:var(--mono);font-size:0.65rem;color:var(--ochre);font-weight:500;margin-left:0.4rem}
+.pp-q-list{display:flex;flex-direction:column;gap:0.4rem}
+.pp-q{display:grid;grid-template-columns:1fr auto;gap:0.7rem;padding:0.55rem 0.7rem;background:var(--wash);border:1px solid var(--rule);font-family:var(--display);font-style:italic;font-size:0.92rem;line-height:1.4;color:var(--ink);align-items:center}
+.pp-q button{padding:0.3rem 0.55rem;font-family:var(--ui);font-style:normal;font-size:0.62rem;font-weight:600;letter-spacing:0.08em;background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer;text-transform:uppercase;white-space:nowrap}
+.pp-q button:hover{background:var(--claret)}
+
+/* COMPARISON TABLES (in Reference section) */
+.cmp-table-wrap{margin-bottom:2rem}
+.cmp-title{font-family:var(--display);font-size:1.25rem;font-weight:600;margin-bottom:0.4rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.cmp-title em{color:var(--claret);font-style:italic}
+.cmp-paper{font-family:var(--mono);font-size:0.7rem;color:var(--ochre);font-weight:500}
+.cmp-table{width:100%;border-collapse:collapse;background:var(--wash);border:1px solid var(--rule-strong);font-size:0.85rem}
+.cmp-table thead{background:var(--ink);color:var(--paper)}
+.cmp-table th{padding:0.6rem 0.75rem;text-align:left;font-family:var(--ui);font-size:0.65rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600}
+.cmp-table td{padding:0.5rem 0.75rem;border-bottom:1px solid var(--rule);border-right:1px solid var(--rule);vertical-align:top}
+.cmp-table td:last-child{border-right:none}
+.cmp-table tr:nth-child(even) td{background:rgba(245,239,227,0.45)}
+body.dark .cmp-table tr:nth-child(even) td{background:rgba(245,239,227,0.05)}
+.cmp-table tr:last-child td{border-bottom:none}
+.cmp-table td:first-child{font-family:var(--display);font-weight:600;color:var(--claret-deep);width:20%}
+@media (max-width:780px){.cmp-table-wrap{overflow-x:auto}.cmp-table{min-width:520px}}
+
 .orientation{font-family:var(--display);font-style:italic;font-size:1.1rem;line-height:1.5;color:var(--ink);max-width:64ch;border-left:3px solid var(--claret);padding:0.2rem 0 0.2rem 1rem;margin:0.3rem 0 1.3rem 0.3rem}
 
 .ao-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.1rem}
@@ -379,6 +474,7 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
     </div>
     <div class="masthead-actions">
       <button class="search-trigger" id="open-search" aria-label="Search"><span>&#8980; Search</span><kbd>/</kbd></button>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">&#9788; / &#9789;</button>
       <button class="print-btn" onclick="window.print()" aria-label="Print"><span>&#9112; Print</span></button>
     </div>
   </div>
@@ -440,7 +536,14 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
       <button class="tool-btn" id="tool-random"><span class="ti">⚂</span> Random topic</button>
       <button class="tool-btn" id="tool-flashcards"><span class="ti">♦</span> Quote flashcards</button>
       <button class="tool-btn" id="tool-essay-gen"><span class="ti">✎</span> Essay question generator</button>
+      <button class="tool-btn" id="tool-timed"><span class="ti">◷</span> Timed essay (40 min)</button>
+      <button class="tool-btn" id="tool-quiz"><span class="ti">?</span> Scholar quiz</button>
+      <button class="tool-btn" id="tool-past-papers"><span class="ti">§</span> Past-paper questions</button>
       <button class="tool-btn" id="tool-print"><span class="ti">⎙</span> Print only studied / bookmarked…</button>
+      <div id="streak-display" class="streak-display" style="display:none">
+        <div><span class="streak-num" id="streak-num">0</span> <span class="streak-label">day streak</span></div>
+        <div style="text-align:right"><span class="streak-num" id="today-num" style="color:var(--green)">0</span> <span class="streak-label">today</span></div>
+      </div>
     </div>
   </aside>
   <main class="main" id="main"><div class="app-loading">Loading revision content&hellip;</div></main>
@@ -488,6 +591,29 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
   </div>
 </div>
 
+<div class="search-modal" id="quiz-modal" role="dialog" aria-label="Scholar quiz">
+  <div class="search-box">
+    <div class="search-input-wrap">
+      <span class="search-icon">?</span>
+      <div style="flex:1"><div style="font-family:var(--display);font-size:1.2rem;font-weight:600;font-style:italic;color:var(--claret)">Scholar quiz</div><div style="font-family:var(--ui);font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-top:0.15rem">Whose position is this?</div></div>
+      <button class="search-close" id="quiz-close">ESC</button>
+    </div>
+    <div id="quiz-body" class="quiz-body"></div>
+    <div class="quiz-score" id="quiz-score"></div>
+  </div>
+</div>
+
+<div class="search-modal" id="past-papers-modal" role="dialog" aria-label="Past papers">
+  <div class="search-box">
+    <div class="search-input-wrap">
+      <span class="search-icon">§</span>
+      <div style="flex:1"><div style="font-family:var(--display);font-size:1.2rem;font-weight:600;font-style:italic;color:var(--claret)">Past-paper questions</div><div style="font-family:var(--ui);font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-top:0.15rem">Practice prompts by topic, in OCR H573 style</div></div>
+      <button class="search-close" id="past-papers-close">ESC</button>
+    </div>
+    <div id="past-papers-body" class="pp-body"></div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <footer>
@@ -510,6 +636,7 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
 <script src="content-p2.js"></script>
 <script src="content-p3.js"></script>
 <script src="extras.js"></script>
+<script src="past-papers.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

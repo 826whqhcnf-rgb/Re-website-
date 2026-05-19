@@ -2,7 +2,7 @@
 
 /* PROGRESS STATE (localStorage) */
 const STORAGE_KEY = 'h573_progress_v1';
-const DEFAULT_STATE = { studied: {}, bookmarks: {}, hiddenThesis: false, notes: {}, filter: 'all' };
+const DEFAULT_STATE = { studied: {}, bookmarks: {}, hiddenThesis: false, notes: {}, filter: 'all', theme: 'light', studyDays: {}, quizScore: { correct: 0, total: 0 } };
 let STATE = JSON.parse(JSON.stringify(DEFAULT_STATE));
 try {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -13,8 +13,71 @@ try {
     STATE.bookmarks = STATE.bookmarks || {};
     STATE.notes = STATE.notes || {};
     STATE.filter = STATE.filter || 'all';
+    STATE.theme = STATE.theme || 'light';
+    STATE.studyDays = STATE.studyDays || {};
+    STATE.quizScore = STATE.quizScore || { correct: 0, total: 0 };
   }
 } catch(e){}
+
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function recordStudyToday(){ STATE.studyDays[todayKey()] = true; saveState(); }
+function computeStreak(){
+  const days = Object.keys(STATE.studyDays || {}).sort().reverse();
+  if (!days.length) return 0;
+  const today = todayKey();
+  const yesterday = (function(){
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  })();
+  if (days[0] !== today && days[0] !== yesterday) return 0;
+  let streak = 0;
+  let cursor = new Date();
+  if (days[0] === yesterday) cursor.setDate(cursor.getDate() - 1);
+  for (let i = 0; i < 365; i++){
+    const key = cursor.getFullYear() + '-' + String(cursor.getMonth()+1).padStart(2,'0') + '-' + String(cursor.getDate()).padStart(2,'0');
+    if (STATE.studyDays[key]) streak++;
+    else break;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+function topicsStudiedToday(){
+  const today = todayKey();
+  let count = 0;
+  Object.keys(STATE.studied).forEach(function(k){
+    const ts = STATE.studied[k];
+    if (typeof ts !== 'number') return;
+    const d = new Date(ts);
+    const dk = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (dk === today) count++;
+  });
+  return count;
+}
+function updateStreakDisplay(){
+  const el = document.getElementById('streak-display');
+  if (!el) return;
+  document.getElementById('streak-num').textContent = computeStreak();
+  document.getElementById('today-num').textContent = topicsStudiedToday();
+}
+
+/* Spaced-repetition status for a topic */
+function topicDueStatus(paperId, topicId){
+  const k = topicKey(paperId, topicId);
+  const ts = STATE.studied[k];
+  if (typeof ts !== 'number') return { state: 'never', label: 'New', days: null };
+  const daysSince = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+  if (daysSince < 4) return { state: 'fresh', label: 'Studied ' + (daysSince === 0 ? 'today' : daysSince + 'd ago'), days: daysSince };
+  if (daysSince < 14) return { state: 'due', label: 'Due (' + daysSince + 'd ago)', days: daysSince };
+  return { state: 'overdue', label: 'Overdue (' + daysSince + 'd ago)', days: daysSince };
+}
+
+/* THEME */
+function applyTheme(){
+  document.body.classList.toggle('dark', STATE.theme === 'dark');
+}
 function saveState(){
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); } catch(e){}
 }
@@ -110,7 +173,12 @@ function renderTopicPaper(paperId, paper){
     html += '<article class="topic' + stateCls + '" id="' + t.id + '">' +
       '<header class="topic-header"><div class="topic-num">&sect; ' + num + '</div>' +
       '<div class="topic-title-block"><h2>' + t.title + '</h2>' +
-      '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div></div>' +
+      '<div class="spec-tags">' + t.spec.map(function(s){ return '<span class="spec-tag">' + s + '</span>'; }).join('') + '</div>' +
+      (function(){
+        const due = topicDueStatus(paperId, t.id);
+        return '<div class="topic-meta-row"><span class="topic-due-pill ' + due.state + '">' + due.label + '</span></div>';
+      })() +
+      '</div>' +
       '<div class="topic-actions">' +
         '<button class="t-action ' + (isStudied ? 'studied' : '') + '" data-action="studied" data-key="' + tkey + '"><span class="ico">✓</span><span>' + (isStudied ? 'Studied' : 'Mark studied') + '</span></button>' +
         '<button class="t-action ' + (isBookmarked ? 'bookmarked' : '') + '" data-action="bookmark" data-key="' + tkey + '"><span class="ico">★</span><span>' + (isBookmarked ? 'Bookmarked' : 'Bookmark') + '</span></button>' +
@@ -285,9 +353,11 @@ function wireTopicActions(paperId){
         toast(action === 'studied' ? 'Removed from studied' : 'Bookmark removed');
       } else {
         store[key] = Date.now();
+        if (action === 'studied') recordStudyToday();
         toast(action === 'studied' ? 'Marked as studied' : 'Bookmarked', 'success');
       }
       saveState();
+      updateStreakDisplay();
       const scrollY = window.scrollY;
       renderPaper(paperId);
       window.scrollTo(0, scrollY);
@@ -353,6 +423,7 @@ function renderReference(paper){
       '<h2 class="ref-title">' + s.title + '</h2></header>';
     if (s.kind === 'glossary') html += renderGlossary(s);
     else if (s.kind === 'timeline') html += renderTimeline(s);
+    else if (s.kind === 'comparisons') html += renderComparisons();
     html += '</article>';
   });
   html += '</section>';
@@ -382,6 +453,22 @@ function renderGlossary(s){
       '<div class="gloss-def">' + item.def + '</div></div>';
   });
   html += '</div><div class="gloss-empty" id="gloss-empty" style="display:none">No terms match.</div>';
+  return html;
+}
+
+function renderComparisons(){
+  let html = '<p class="ref-desc">Side-by-side comparisons of rival theories and thinkers across the H573 specification. Use them to drill the contrasts examiners reward.</p>';
+  (typeof COMPARISONS !== 'undefined' ? COMPARISONS : []).forEach(function(c){
+    html += '<div class="cmp-table-wrap" id="cmp-' + c.id + '">' +
+      '<h3 class="cmp-title"><span>' + c.title + '</span><span class="cmp-paper">' + c.paper + '</span></h3>' +
+      '<table class="cmp-table"><thead><tr>' +
+      c.headers.map(function(h){ return '<th>' + h + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      c.rows.map(function(r){
+        return '<tr>' + r.map(function(cell){ return '<td>' + cell + '</td>'; }).join('') + '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  });
   return html;
 }
 
@@ -881,6 +968,16 @@ document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') essayModal.classList.remove('active');
     return;
   }
+  const quizModal = document.getElementById('quiz-modal');
+  if (quizModal.classList.contains('active')){
+    if (e.key === 'Escape') quizModal.classList.remove('active');
+    return;
+  }
+  const ppModal = document.getElementById('past-papers-modal');
+  if (ppModal.classList.contains('active')){
+    if (e.key === 'Escape') ppModal.classList.remove('active');
+    return;
+  }
   const modalOpen = modal.classList.contains('active');
   if (modalOpen){
     if (e.key === 'Escape') closeSearch();
@@ -1086,8 +1183,287 @@ document.getElementById('tool-print').addEventListener('click', function(){
   }, 100);
 });
 
+/* ===== DARK MODE ===== */
+document.getElementById('theme-toggle').addEventListener('click', function(){
+  STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
+  saveState();
+  applyTheme();
+  toast(STATE.theme === 'dark' ? 'Dark mode' : 'Light mode');
+});
+
+/* ===== SCHOLAR QUIZ ===== */
+let QUIZ_BANK = [];
+let QUIZ_CURRENT = null;
+function buildQuizBank(){
+  QUIZ_BANK = [];
+  ['01','02','03'].forEach(function(p){
+    (CONTENT[p].topics || []).forEach(function(t){
+      (t.scholars || []).forEach(function(s){
+        if (s.pos && s.pos.length > 20){
+          QUIZ_BANK.push({ scholar: s.name, position: s.pos, topic: stripHtml(t.title), paper: p });
+        }
+      });
+    });
+  });
+}
+function pickQuizQuestion(){
+  if (!QUIZ_BANK.length) buildQuizBank();
+  if (!QUIZ_BANK.length) return null;
+  const q = QUIZ_BANK[Math.floor(Math.random() * QUIZ_BANK.length)];
+  const allScholars = Array.from(new Set(QUIZ_BANK.map(function(x){ return x.scholar; })));
+  const wrong = allScholars.filter(function(s){ return s !== q.scholar; });
+  for (let i = wrong.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = wrong[i]; wrong[i] = wrong[j]; wrong[j] = tmp;
+  }
+  const options = [q.scholar].concat(wrong.slice(0, 3));
+  for (let i = options.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = options[i]; options[i] = options[j]; options[j] = tmp;
+  }
+  return { question: q, options: options };
+}
+function renderQuiz(){
+  QUIZ_CURRENT = pickQuizQuestion();
+  if (!QUIZ_CURRENT) return;
+  const q = QUIZ_CURRENT.question;
+  let html = '<div class="quiz-prompt">Whose position is this?</div>' +
+    '<div class="quiz-position">&ldquo;' + escapeHtml(q.position) + '&rdquo;</div>' +
+    '<div class="quiz-options">';
+  QUIZ_CURRENT.options.forEach(function(opt){
+    html += '<button class="quiz-option" data-answer="' + escapeHtml(opt) + '">' + opt + '</button>';
+  });
+  html += '</div><div class="quiz-feedback" id="quiz-feedback"></div>' +
+    '<div style="text-align:center;margin-top:1rem"><button class="primary" id="quiz-next" style="display:none;padding:0.5rem 1.2rem;font-family:var(--ui);font-size:0.75rem;font-weight:600;background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer;letter-spacing:0.04em">Next question →</button></div>';
+  document.getElementById('quiz-body').innerHTML = html;
+  document.getElementById('quiz-score').textContent = 'Score: ' + STATE.quizScore.correct + ' / ' + STATE.quizScore.total + ' correct';
+  document.querySelectorAll('.quiz-option').forEach(function(b){
+    b.addEventListener('click', function(){
+      const ans = b.dataset.answer;
+      const correct = ans === q.scholar;
+      STATE.quizScore.total++;
+      if (correct) STATE.quizScore.correct++;
+      saveState();
+      document.querySelectorAll('.quiz-option').forEach(function(x){
+        x.classList.add('disabled');
+        x.style.pointerEvents = 'none';
+        if (x.dataset.answer === q.scholar) x.classList.add('correct');
+        else if (x === b && !correct) x.classList.add('wrong');
+      });
+      const fb = document.getElementById('quiz-feedback');
+      fb.className = 'quiz-feedback show ' + (correct ? 'right' : 'wrong');
+      fb.innerHTML = '<strong>' + (correct ? '✓ Correct' : '✗ Wrong') + '.</strong> The position is held by <strong>' + q.scholar + '</strong> in the topic <em>' + q.topic + '</em> (Paper ' + q.paper + ').';
+      document.getElementById('quiz-score').textContent = 'Score: ' + STATE.quizScore.correct + ' / ' + STATE.quizScore.total + ' correct';
+      document.getElementById('quiz-next').style.display = 'inline-block';
+    });
+  });
+  setTimeout(function(){
+    const next = document.getElementById('quiz-next');
+    if (next) next.addEventListener('click', renderQuiz);
+  }, 50);
+}
+document.getElementById('tool-quiz').addEventListener('click', function(){
+  buildQuizBank();
+  renderQuiz();
+  document.getElementById('quiz-modal').classList.add('active');
+});
+document.getElementById('quiz-close').addEventListener('click', function(){
+  document.getElementById('quiz-modal').classList.remove('active');
+});
+document.getElementById('quiz-modal').addEventListener('click', function(e){
+  if (e.target.id === 'quiz-modal') document.getElementById('quiz-modal').classList.remove('active');
+});
+
+/* ===== PAST PAPERS BROWSER ===== */
+function renderPastPapers(filter){
+  let html = '<div class="pp-filter">' +
+    '<button class="' + (!filter || filter === 'all' ? 'active' : '') + '" data-pp-filter="all">All</button>' +
+    '<button class="' + (filter === '01' ? 'active' : '') + '" data-pp-filter="01">Paper 01</button>' +
+    '<button class="' + (filter === '02' ? 'active' : '') + '" data-pp-filter="02">Paper 02</button>' +
+    '<button class="' + (filter === '03' ? 'active' : '') + '" data-pp-filter="03">Paper 03</button>' +
+    '</div>';
+  ['01','02','03'].forEach(function(p){
+    if (filter && filter !== 'all' && filter !== p) return;
+    (CONTENT[p].topics || []).forEach(function(t){
+      const qs = (typeof PAST_PAPERS !== 'undefined' && PAST_PAPERS[t.id]) || [];
+      if (!qs.length) return;
+      html += '<div class="pp-topic"><div class="pp-topic-head">' + stripHtml(t.title) + '<span>Paper ' + p + '</span></div><div class="pp-q-list">';
+      qs.forEach(function(q, qi){
+        html += '<div class="pp-q"><span>' + q + '</span><button data-pp-paper="' + p + '" data-pp-topic="' + t.id + '" data-pp-q-idx="' + qi + '">Start timed</button></div>';
+      });
+      html += '</div></div>';
+    });
+  });
+  document.getElementById('past-papers-body').innerHTML = html;
+  document.querySelectorAll('.pp-filter button').forEach(function(b){
+    b.addEventListener('click', function(){ renderPastPapers(b.dataset.ppFilter); });
+  });
+  document.querySelectorAll('.pp-q button').forEach(function(b){
+    b.addEventListener('click', function(){
+      const p = b.dataset.ppPaper;
+      const tid = b.dataset.ppTopic;
+      const qi = parseInt(b.dataset.ppQIdx);
+      const question = PAST_PAPERS[tid][qi];
+      document.getElementById('past-papers-modal').classList.remove('active');
+      startTimedEssay(question, p, tid);
+    });
+  });
+}
+document.getElementById('tool-past-papers').addEventListener('click', function(){
+  renderPastPapers('all');
+  document.getElementById('past-papers-modal').classList.add('active');
+});
+document.getElementById('past-papers-close').addEventListener('click', function(){
+  document.getElementById('past-papers-modal').classList.remove('active');
+});
+document.getElementById('past-papers-modal').addEventListener('click', function(e){
+  if (e.target.id === 'past-papers-modal') document.getElementById('past-papers-modal').classList.remove('active');
+});
+
+/* ===== TIMED ESSAY MODE ===== */
+const TIMED_KEY = 'h573_timed_current_v1';
+let TIMED_TIMER = null;
+let TIMED_SAVE = null;
+const TIMED_DURATION = 40 * 60;
+
+function startTimedEssay(question, paper, topicId){
+  let session = null;
+  try {
+    const cur = localStorage.getItem(TIMED_KEY);
+    if (cur){
+      const parsed = JSON.parse(cur);
+      if (!question && !parsed.completed){
+        if (confirm('You have a timed essay in progress on "' + parsed.question.slice(0, 60) + '...". Resume it?')){
+          session = parsed;
+        } else {
+          localStorage.removeItem(TIMED_KEY);
+        }
+      }
+    }
+  } catch(e){}
+  if (!session){
+    if (!question){
+      const all = [];
+      ['01','02','03'].forEach(function(p){ (CONTENT[p].topics || []).forEach(function(t){ all.push({ p: p, t: t }); }); });
+      const pick = all[Math.floor(Math.random() * all.length)];
+      question = pick.t.exam;
+      paper = pick.p;
+      topicId = pick.t.id;
+    }
+    session = { question: question, paper: paper, topicId: topicId, plan: '', essay: '', startTime: Date.now(), duration: TIMED_DURATION, completed: false };
+  }
+  try { localStorage.setItem(TIMED_KEY, JSON.stringify(session)); } catch(e){}
+  renderTimedSession(session);
+}
+function renderTimedSession(session){
+  if (TIMED_TIMER){ clearInterval(TIMED_TIMER); TIMED_TIMER = null; }
+  if (TIMED_SAVE){ clearInterval(TIMED_SAVE); TIMED_SAVE = null; }
+  const main = document.getElementById('main');
+  document.querySelectorAll('.paper-tab').forEach(function(t){ t.setAttribute('aria-selected', 'false'); });
+  document.getElementById('toc-list').innerHTML = '<li><a href="#" onclick="return false">Timed essay in progress</a></li>';
+  document.getElementById('toc-progress').style.display = 'none';
+  document.getElementById('toc-tools').style.display = 'none';
+  main.innerHTML = '<div class="timed-bar" id="timed-bar">' +
+    '<div class="timer-display" id="timer-display">--:--</div>' +
+    '<div class="timer-progress-track"><div class="timer-progress-fill" id="timer-fill" style="width:100%"></div></div>' +
+    '<div class="word-counter" id="word-counter"><b>0</b> <small>/ ~600-900</small></div>' +
+    '<button class="timed-stop" id="timed-stop">Stop &amp; self-mark</button>' +
+    '</div>' +
+    '<div class="timed-question">' + session.question + '<span style="display:block;font-family:var(--ui);font-style:normal;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-top:0.5rem;font-weight:600">Paper ' + session.paper + '</span></div>' +
+    '<div class="timed-plan"><div class="timed-plan-label">Plan <small>thesis line + three paragraph topic sentences (2-3 min max)</small></div>' +
+    '<textarea id="timed-plan-area" placeholder="Thesis: ...&#10;Paragraph 1: ...&#10;Paragraph 2: ...&#10;Paragraph 3: ...">' + escapeHtml(session.plan) + '</textarea></div>' +
+    '<div class="timed-essay-wrap"><div class="timed-essay-label">Essay <small>auto-saved every 15 seconds</small></div>' +
+    '<textarea id="timed-essay-area" placeholder="Open with a definition and a committed thesis. Integrate AO1 and AO2 in every paragraph. Build to a verdict.">' + escapeHtml(session.essay) + '</textarea></div>' +
+    '<div style="margin-top:1rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap"><span id="timed-saved" style="font-family:var(--ui);font-size:0.7rem;color:var(--muted);font-style:italic"></span>' +
+    '<div style="display:flex;gap:0.5rem"><button id="timed-discard" style="padding:0.55rem 1rem;font-family:var(--ui);font-size:0.75rem;font-weight:600;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);cursor:pointer;border-radius:2px">Discard</button>' +
+    '<button id="timed-finish" style="padding:0.55rem 1rem;font-family:var(--ui);font-size:0.75rem;font-weight:600;background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer">Finish &amp; self-mark</button></div></div>';
+  const planArea = document.getElementById('timed-plan-area');
+  const essayArea = document.getElementById('timed-essay-area');
+  const counter = document.getElementById('word-counter');
+  const savedEl = document.getElementById('timed-saved');
+  function updateWords(){
+    const n = (essayArea.value.trim().match(/\S+/g) || []).length;
+    counter.innerHTML = '<b>' + n + '</b> <small>/ ~600-900</small>';
+  }
+  essayArea.addEventListener('input', updateWords);
+  updateWords();
+  function persist(){
+    const cur = session;
+    cur.plan = planArea.value;
+    cur.essay = essayArea.value;
+    try { localStorage.setItem(TIMED_KEY, JSON.stringify(cur)); } catch(e){}
+    savedEl.textContent = 'Saved ' + new Date().toLocaleTimeString();
+  }
+  TIMED_SAVE = setInterval(persist, 15000);
+  function updateTimer(){
+    const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
+    const remaining = Math.max(0, session.duration - elapsed);
+    const m = Math.floor(remaining / 60), s = remaining % 60;
+    const display = document.getElementById('timer-display');
+    if (display) display.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    const fill = document.getElementById('timer-fill');
+    if (fill) fill.style.width = (remaining / session.duration * 100) + '%';
+    const bar = document.getElementById('timed-bar');
+    if (bar){
+      bar.classList.remove('warning','expired');
+      if (remaining === 0) bar.classList.add('expired');
+      else if (remaining <= 5 * 60) bar.classList.add('warning');
+    }
+    if (remaining === 0){ finishTimed(); }
+  }
+  updateTimer();
+  TIMED_TIMER = setInterval(updateTimer, 1000);
+  function finishTimed(){
+    if (TIMED_TIMER){ clearInterval(TIMED_TIMER); TIMED_TIMER = null; }
+    if (TIMED_SAVE){ clearInterval(TIMED_SAVE); TIMED_SAVE = null; }
+    persist();
+    session.completed = true;
+    try { localStorage.setItem(TIMED_KEY, JSON.stringify(session)); } catch(e){}
+    /* Flow into marker */
+    document.querySelectorAll('.paper-tab').forEach(function(t){ t.setAttribute('aria-selected', t.dataset.paper === '06' ? 'true' : 'false'); });
+    renderMarker(CONTENT['06']);
+    setTimeout(function(){
+      const qInput = document.getElementById('mk-q');
+      const eArea = document.getElementById('mk-essay');
+      if (qInput) qInput.value = session.question;
+      if (eArea){ eArea.value = session.essay; eArea.dispatchEvent(new Event('input')); }
+      try { localStorage.removeItem(TIMED_KEY); } catch(e){}
+    }, 100);
+  }
+  document.getElementById('timed-finish').addEventListener('click', finishTimed);
+  document.getElementById('timed-stop').addEventListener('click', finishTimed);
+  document.getElementById('timed-discard').addEventListener('click', function(){
+    if (!confirm('Discard this essay? It cannot be recovered.')) return;
+    if (TIMED_TIMER){ clearInterval(TIMED_TIMER); TIMED_TIMER = null; }
+    if (TIMED_SAVE){ clearInterval(TIMED_SAVE); TIMED_SAVE = null; }
+    try { localStorage.removeItem(TIMED_KEY); } catch(e){}
+    document.querySelectorAll('.paper-tab').forEach(function(x){ x.setAttribute('aria-selected', x.dataset.paper === '01' ? 'true' : 'false'); });
+    renderPaper('01');
+  });
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+document.getElementById('tool-timed').addEventListener('click', function(){ startTimedEssay(); });
+
+/* Show streak panel on topic papers */
+function showStreakDisplay(){
+  const tools = document.getElementById('toc-tools');
+  const streak = document.getElementById('streak-display');
+  if (tools && streak){
+    streak.style.display = tools.style.display === 'block' ? 'flex' : 'none';
+  }
+  updateStreakDisplay();
+}
+const _origRenderPaper = renderPaper;
+window.renderPaper = function(p){
+  _origRenderPaper(p);
+  setTimeout(showStreakDisplay, 50);
+};
+
+applyTheme();
 buildScholarIndex();
 buildSearchIndex();
 buildFlashDeck();
+buildQuizBank();
 renderPaper('01');
 applyFilter();
+updateStreakDisplay();

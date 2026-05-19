@@ -209,8 +209,9 @@ CONTENT["04"] = {
 CONTENT["05"] = {
   title: "Reference",
   code: "Quick lookup",
-  intro: "Cross-cutting reference material: glossary of every technical term the H573 specification expects you to know, and a chronological timeline of the major thinkers.",
+  intro: "Cross-cutting reference material: glossary of every technical term the H573 specification expects you to know, side-by-side comparison tables of rival theories, and a chronological timeline of the major thinkers.",
   sections: [
+    {id:"comparisons",title:"Comparison <em>Tables</em>",kind:"comparisons"},
     {id:"glossary",title:"<em>Glossary</em>",kind:"glossary",items:[
       {term:"a posteriori",def:"Knowledge derived from experience. Cosmological and teleological arguments are a posteriori.",paper:"P1"},
       {term:"a priori",def:"Knowledge independent of experience, derived by reason alone. The ontological argument.",paper:"P1"},
