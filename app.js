@@ -149,6 +149,7 @@ function openScholar(key){
 function closeScholar(){ document.getElementById('scholar-modal').classList.remove('active'); }
 
 function renderPaper(paperId){
+  if (paperId === '07') return (typeof renderGizmo === 'function') ? renderGizmo() : null;
   const paper = CONTENT[paperId];
   if (!paper) return;
   if (paperId === '04') return renderCraft(paper);

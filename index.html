@@ -461,6 +461,168 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
   .paper-section{display:block!important;page-break-after:always}
   .topic{page-break-inside:avoid}
 }
+
+/* ===== GIZMO TAB ===== */
+.paper-tab.gizmo-tab .pt-num{color:#2d7a8a}
+.paper-tab.gizmo-tab .pt-title em{color:#2d7a8a;font-style:italic}
+.paper-tab.gizmo-tab[aria-selected="true"] .pt-num{color:#7ed5e5}
+.paper-tab.gizmo-tab[aria-selected="true"] .pt-title em{color:#7ed5e5}
+
+.gizmo{font-family:var(--ui);max-width:100%}
+.gizmo-hero{background:linear-gradient(135deg,#0f2730,#1a3a44 55%,#2d7a8a);color:#e8f4f6;border-radius:6px;padding:1.8rem 2rem;margin-bottom:1.6rem;box-shadow:0 12px 30px -16px rgba(15,39,48,0.5);position:relative;overflow:hidden}
+.gizmo-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,rgba(126,213,229,0.18),transparent 60%);pointer-events:none}
+.gizmo-hero-eyebrow{font-size:0.65rem;letter-spacing:0.28em;text-transform:uppercase;color:#7ed5e5;font-weight:600;margin-bottom:0.4rem}
+.gizmo-hero h1{font-family:var(--display);font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:500;line-height:1.05;margin-bottom:0.4rem}
+.gizmo-hero h1 em{color:#7ed5e5;font-style:italic}
+.gizmo-hero-sub{font-family:var(--display);font-style:italic;color:rgba(232,244,246,0.78);font-size:1.02rem;max-width:60ch}
+.gizmo-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.8rem;margin-top:1.4rem;position:relative;z-index:1}
+.gizmo-stat{background:rgba(255,255,255,0.07);border:1px solid rgba(126,213,229,0.18);border-radius:4px;padding:0.7rem 0.9rem;backdrop-filter:blur(4px)}
+.gizmo-stat-label{font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(232,244,246,0.6);margin-bottom:0.25rem}
+.gizmo-stat-val{font-family:var(--display);font-size:1.7rem;font-weight:500;color:#fff;line-height:1}
+.gizmo-stat-val em{color:#7ed5e5;font-style:normal}
+.gizmo-stat-sub{font-size:0.65rem;color:rgba(232,244,246,0.55);margin-top:0.2rem}
+.gizmo-power-bar{margin-top:0.45rem;height:5px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden}
+.gizmo-power-fill{height:100%;background:linear-gradient(90deg,#7ed5e5,#a4f0a4);border-radius:99px;transition:width 0.5s ease}
+
+.gizmo-modes{display:flex;gap:0.4rem;margin-bottom:1.4rem;border-bottom:2px solid var(--rule-strong);padding-bottom:0;flex-wrap:wrap}
+.gizmo-mode{padding:0.6rem 1rem;font-family:var(--ui);font-size:0.78rem;font-weight:500;background:none;border:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;letter-spacing:0.02em;display:flex;align-items:center;gap:0.4rem}
+.gizmo-mode:hover{color:var(--ink)}
+.gizmo-mode.active{color:#2d7a8a;border-bottom-color:#2d7a8a;font-weight:600}
+.gizmo-mode .mode-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 0.4em;background:#2d7a8a;color:#fff;font-size:0.6rem;font-weight:600;border-radius:99px;font-family:var(--mono)}
+.gizmo-mode.active .mode-count{background:#c4892f}
+
+.gizmo-panel{display:none}
+.gizmo-panel.active{display:block}
+
+.gizmo-cta{display:grid;grid-template-columns:1fr auto;gap:1.4rem;align-items:center;background:var(--paper-deep);border:1px solid var(--rule-strong);border-radius:4px;padding:1.2rem 1.4rem;margin-bottom:1.6rem}
+.gizmo-cta-text{font-family:var(--display);font-size:1.1rem;color:var(--ink)}
+.gizmo-cta-text strong{color:#2d7a8a;font-weight:600}
+.gizmo-cta-text .cta-sub{display:block;font-family:var(--ui);font-style:normal;font-size:0.75rem;color:var(--muted);margin-top:0.25rem;letter-spacing:0.02em}
+.gizmo-cta-btn{padding:0.7rem 1.4rem;font-family:var(--ui);font-size:0.78rem;font-weight:600;background:#2d7a8a;color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;display:flex;align-items:center;gap:0.5rem;transition:all 0.15s}
+.gizmo-cta-btn:hover{background:#1a3a44;transform:translateY(-1px);box-shadow:0 6px 14px -6px rgba(45,122,138,0.6)}
+.gizmo-cta-btn:disabled{background:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+.gizmo-cta-btn .ico{font-size:1rem}
+
+.gizmo-search{width:100%;padding:0.6rem 0.9rem;font-family:var(--body);font-size:0.85rem;border:1px solid var(--rule-strong);border-radius:3px;background:var(--wash);margin-bottom:1.2rem;color:var(--ink)}
+.gizmo-search:focus{outline:none;border-color:#2d7a8a;background:var(--paper)}
+
+.gizmo-paper-group{margin-bottom:2rem}
+.gizmo-paper-head{font-family:var(--display);font-size:1.3rem;font-weight:500;color:var(--ink);padding-bottom:0.5rem;border-bottom:1px solid var(--rule-strong);margin-bottom:1rem;display:flex;justify-content:space-between;align-items:baseline}
+.gizmo-paper-head em{color:var(--claret);font-style:italic}
+.gizmo-paper-head .group-meta{font-family:var(--ui);font-size:0.68rem;color:var(--muted);letter-spacing:0.06em;font-weight:500}
+
+.gizmo-deck-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.9rem}
+.gizmo-deck{background:var(--paper);border:1px solid var(--rule-strong);border-radius:4px;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem;transition:all 0.15s;position:relative;overflow:hidden}
+.gizmo-deck:hover{border-color:#2d7a8a;box-shadow:0 8px 20px -10px rgba(45,122,138,0.3);transform:translateY(-2px)}
+.gizmo-deck.has-due::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:#c4892f}
+.gizmo-deck-head{display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem}
+.gizmo-deck-title{font-family:var(--display);font-size:1.05rem;font-weight:500;color:var(--ink);line-height:1.2;flex:1}
+.gizmo-deck-title em{color:var(--claret);font-style:italic}
+.gizmo-deck-badge{font-family:var(--mono);font-size:0.62rem;background:#c4892f;color:#fff;padding:0.15em 0.5em;border-radius:99px;font-weight:600;letter-spacing:0.04em;white-space:nowrap}
+.gizmo-deck-meta{font-family:var(--ui);font-size:0.68rem;color:var(--muted);letter-spacing:0.02em}
+.gizmo-deck-bar{display:flex;height:6px;background:var(--paper-deep);border-radius:99px;overflow:hidden}
+.gizmo-deck-bar > span{display:block;height:100%}
+.gizmo-deck-bar .seg-new{background:#9ec1d1}
+.gizmo-deck-bar .seg-learning{background:#c4892f}
+.gizmo-deck-bar .seg-reviewing{background:#6b9a6b}
+.gizmo-deck-bar .seg-mastered{background:#2d7a8a}
+.gizmo-deck-legend{display:flex;gap:0.7rem;font-family:var(--ui);font-size:0.62rem;color:var(--muted);flex-wrap:wrap}
+.gizmo-deck-legend span{display:flex;align-items:center;gap:0.3rem}
+.gizmo-deck-legend i{width:7px;height:7px;border-radius:99px;display:inline-block}
+.gizmo-deck-actions{display:flex;gap:0.4rem;margin-top:0.3rem}
+.gizmo-deck-actions button{flex:1;padding:0.5rem 0.6rem;font-family:var(--ui);font-size:0.7rem;font-weight:600;border-radius:3px;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink);cursor:pointer;letter-spacing:0.03em;transition:all 0.12s}
+.gizmo-deck-actions button:hover{border-color:#2d7a8a;color:#2d7a8a}
+.gizmo-deck-actions button.primary{background:#2d7a8a;color:#fff;border-color:#2d7a8a}
+.gizmo-deck-actions button.primary:hover{background:#1a3a44;color:#fff}
+
+.gizmo-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.9rem;margin-bottom:1.8rem}
+.gizmo-stat-card{background:var(--paper);border:1px solid var(--rule-strong);border-radius:4px;padding:1rem 1.1rem}
+.gizmo-stat-card-label{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:0.3rem}
+.gizmo-stat-card-val{font-family:var(--display);font-size:2rem;font-weight:500;line-height:1;color:var(--ink)}
+.gizmo-stat-card-val em{color:#2d7a8a;font-style:italic}
+.gizmo-stat-card-sub{font-family:var(--ui);font-size:0.7rem;color:var(--muted);margin-top:0.35rem}
+
+.gizmo-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-width:240px;margin-top:0.6rem}
+.gizmo-cal-day{aspect-ratio:1;border-radius:2px;background:var(--paper-deep);position:relative}
+.gizmo-cal-day.studied{background:#2d7a8a}
+.gizmo-cal-day.today{outline:2px solid var(--claret);outline-offset:1px}
+.gizmo-cal-day .cal-label{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:0.55rem;color:var(--muted)}
+
+.gizmo-empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-family:var(--display);font-style:italic;font-size:1.05rem}
+.gizmo-empty .gizmo-empty-ico{font-size:2.4rem;color:#2d7a8a;margin-bottom:0.6rem;display:block}
+
+/* Gizmo study modal */
+.gizmo-modal{position:fixed;inset:0;background:rgba(15,39,48,0.85);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+.gizmo-modal.active{display:flex}
+.gizmo-modal-box{width:100%;max-width:640px;background:var(--paper);border-radius:8px;box-shadow:0 30px 80px -20px rgba(0,0,0,0.6);display:flex;flex-direction:column;max-height:92vh;overflow:hidden}
+.gizmo-modal-head{padding:0.9rem 1.2rem;background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:0.8rem}
+.gizmo-modal-progress{flex:1;height:6px;background:rgba(255,255,255,0.15);border-radius:99px;overflow:hidden}
+.gizmo-modal-progress > span{display:block;height:100%;background:linear-gradient(90deg,#7ed5e5,#a4f0a4);transition:width 0.3s ease}
+.gizmo-modal-count{font-family:var(--mono);font-size:0.72rem;color:var(--gold);white-space:nowrap}
+.gizmo-modal-close{padding:0.3rem 0.6rem;font-family:var(--ui);font-size:0.72rem;background:rgba(255,255,255,0.1);color:#fff;border:none;border-radius:2px;cursor:pointer}
+.gizmo-modal-close:hover{background:rgba(255,255,255,0.2)}
+.gizmo-modal-deck{font-family:var(--ui);font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase;color:#7ed5e5;font-weight:600;white-space:nowrap}
+
+.gizmo-card{padding:2.2rem 1.6rem;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:300px;justify-content:center;cursor:pointer;user-select:none;flex:1;background:var(--paper);transition:background 0.2s}
+.gizmo-card.flipped{background:var(--wash)}
+.gizmo-card-side{font-family:var(--ui);font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:0.8rem}
+.gizmo-card.flipped .gizmo-card-side{color:#2d7a8a}
+.gizmo-card-front{font-family:var(--display);font-size:clamp(1.6rem,3.4vw,2.4rem);font-weight:500;line-height:1.15;color:var(--ink);max-width:50ch}
+.gizmo-card-front em{color:var(--claret);font-style:italic}
+.gizmo-card-back{font-family:var(--body);font-size:1.02rem;line-height:1.55;color:var(--ink);max-width:60ch;font-style:italic}
+.gizmo-card-context{margin-top:1rem;font-family:var(--ui);font-size:0.68rem;letter-spacing:0.06em;color:var(--muted)}
+.gizmo-card-context strong{color:var(--claret)}
+.gizmo-card-tap{margin-top:1.2rem;font-family:var(--ui);font-size:0.7rem;color:var(--muted);padding:0.4rem 0.9rem;border:1px dashed var(--rule-strong);border-radius:99px}
+
+.gizmo-grade{display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;padding:0.7rem 1rem 1rem;background:var(--paper-deep);border-top:1px solid var(--rule-strong)}
+.gizmo-grade-btn{padding:0.7rem 0.4rem;font-family:var(--ui);font-size:0.72rem;font-weight:600;border:none;border-radius:3px;cursor:pointer;color:#fff;letter-spacing:0.04em;display:flex;flex-direction:column;align-items:center;gap:0.15rem;transition:all 0.12s}
+.gizmo-grade-btn:hover{transform:translateY(-2px);box-shadow:0 6px 14px -6px rgba(0,0,0,0.3)}
+.gizmo-grade-btn.again{background:#a83232}
+.gizmo-grade-btn.hard{background:#c4892f}
+.gizmo-grade-btn.good{background:#3d6b3d}
+.gizmo-grade-btn.easy{background:#2d7a8a}
+.gizmo-grade-btn .grade-label{font-size:0.74rem;text-transform:uppercase}
+.gizmo-grade-btn .grade-int{font-family:var(--mono);font-size:0.62rem;font-weight:400;opacity:0.85}
+.gizmo-grade-btn.dim{opacity:0.35;cursor:default;transform:none;box-shadow:none}
+
+/* Quiz mode */
+.gizmo-quiz{padding:1.6rem 1.4rem;flex:1;display:flex;flex-direction:column;gap:1rem}
+.gizmo-quiz-prompt{font-family:var(--ui);font-size:0.66rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center}
+.gizmo-quiz-q{font-family:var(--display);font-size:1.3rem;line-height:1.35;color:var(--ink);text-align:center;font-style:italic;padding:0.5rem 0.5rem 0.8rem;border-bottom:1px solid var(--rule)}
+.gizmo-quiz-opts{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
+@media (max-width:540px){.gizmo-quiz-opts{grid-template-columns:1fr}}
+.gizmo-quiz-opt{padding:0.7rem 0.9rem;font-family:var(--body);font-size:0.92rem;background:var(--wash);border:1px solid var(--rule-strong);border-radius:3px;cursor:pointer;text-align:left;color:var(--ink);transition:all 0.12s}
+.gizmo-quiz-opt:hover:not(.locked){border-color:#2d7a8a;background:var(--paper-deep)}
+.gizmo-quiz-opt.locked{cursor:default}
+.gizmo-quiz-opt.correct{background:#d4e8d4;border-color:#3d6b3d;color:#1f3f1f;font-weight:500}
+.gizmo-quiz-opt.wrong{background:#f0d4d4;border-color:#a83232;color:#5c1a1a}
+.gizmo-quiz-feedback{font-family:var(--body);font-size:0.85rem;line-height:1.5;padding:0.7rem 0.9rem;border-radius:3px;display:none}
+.gizmo-quiz-feedback.show{display:block}
+.gizmo-quiz-feedback.right{background:#e8f4e8;border-left:3px solid #3d6b3d;color:#1f3f1f}
+.gizmo-quiz-feedback.wrong{background:#f7e3e3;border-left:3px solid #a83232;color:#5c1a1a}
+.gizmo-quiz-next{align-self:center;padding:0.6rem 1.6rem;font-family:var(--ui);font-size:0.74rem;font-weight:600;background:var(--ink);color:var(--paper);border:none;border-radius:3px;cursor:pointer;letter-spacing:0.06em;text-transform:uppercase;display:none}
+.gizmo-quiz-next.show{display:inline-block}
+
+/* Session complete */
+.gizmo-done{padding:2.4rem 1.6rem;text-align:center}
+.gizmo-done-ico{font-size:3.4rem;color:#2d7a8a;margin-bottom:0.6rem;font-family:var(--display)}
+.gizmo-done h3{font-family:var(--display);font-size:1.8rem;font-weight:500;color:var(--ink);margin-bottom:0.4rem}
+.gizmo-done h3 em{color:#2d7a8a;font-style:italic}
+.gizmo-done-sub{font-family:var(--display);font-style:italic;color:var(--muted);font-size:1rem;margin-bottom:1.4rem}
+.gizmo-done-row{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:1.4rem}
+.gizmo-done-stat{padding:0.7rem;background:var(--paper-deep);border-radius:3px}
+.gizmo-done-stat-v{font-family:var(--display);font-size:1.4rem;font-weight:500;color:var(--ink)}
+.gizmo-done-stat-l{font-family:var(--ui);font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-top:0.2rem}
+.gizmo-done-actions{display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap}
+.gizmo-done-actions button{padding:0.6rem 1.2rem;font-family:var(--ui);font-size:0.74rem;font-weight:600;border-radius:3px;cursor:pointer;letter-spacing:0.04em;border:1px solid var(--rule-strong);background:var(--wash);color:var(--ink)}
+.gizmo-done-actions button.primary{background:#2d7a8a;color:#fff;border-color:#2d7a8a}
+
+body.dark .gizmo-deck,body.dark .gizmo-stat-card{background:#1f1a18;border-color:rgba(245,239,227,0.15)}
+body.dark .gizmo-modal-box{background:#1f1a18}
+body.dark .gizmo-card{background:#1f1a18}
+body.dark .gizmo-card.flipped{background:#2a201d}
+body.dark .gizmo-grade{background:#15110f;border-color:rgba(245,239,227,0.1)}
+body.dark .gizmo-quiz-opt{background:#15110f}
 </style>
 </head>
 <body>
@@ -511,6 +673,11 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
       <span class="pt-num">&#9658; Marker</span>
       <span class="pt-title">Essay <em>Self-Mark</em></span>
       <span class="pt-sub">OCR levels</span>
+    </button>
+    <button class="paper-tab gizmo-tab" role="tab" data-paper="07" aria-selected="false">
+      <span class="pt-num">&#9881; Gizmo</span>
+      <span class="pt-title">Flashcards <em>SRS</em></span>
+      <span class="pt-sub">Spaced repetition</span>
     </button>
   </div>
 </nav>
@@ -632,11 +799,24 @@ footer kbd{font-family:var(--mono);background:var(--ink);color:var(--gold);paddi
   </div>
 </div>
 
+<div class="gizmo-modal" id="gizmo-modal" role="dialog" aria-label="Flashcard study session">
+  <div class="gizmo-modal-box">
+    <div class="gizmo-modal-head">
+      <span class="gizmo-modal-deck" id="gizmo-modal-deck">Deck</span>
+      <div class="gizmo-modal-progress"><span id="gizmo-modal-progress-fill" style="width:0%"></span></div>
+      <span class="gizmo-modal-count" id="gizmo-modal-count">0 / 0</span>
+      <button class="gizmo-modal-close" id="gizmo-modal-close">ESC</button>
+    </div>
+    <div id="gizmo-modal-body"></div>
+  </div>
+</div>
+
 <script src="content.js"></script>
 <script src="content-p2.js"></script>
 <script src="content-p3.js"></script>
 <script src="extras.js"></script>
 <script src="past-papers.js"></script>
 <script src="app.js"></script>
+<script src="gizmo.js"></script>
 </body>
 </html>
