@@ -137,10 +137,77 @@ function gzMatchAnswer(input, target){
   return 'wrong';
 }
 
+/* ---------- AO1 / AO2 section parsing ---------- */
+// Split HTML by <h3>/<h4> headings into { heading, level, body } segments.
+function gzParseSections(html){
+  const txt = String(html || '');
+  const sections = [];
+  const re = /<(h[34])\b[^>]*>([\s\S]*?)<\/\1>([\s\S]*?)(?=<h[34]\b|$)/gi;
+  let m;
+  while ((m = re.exec(txt)) !== null){
+    const heading = m[2].replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').trim();
+    if (heading.length < 3) continue;
+    sections.push({ level: m[1].toLowerCase(), heading: heading, body: m[3] });
+  }
+  return sections;
+}
+function gzExtractParagraphs(body){
+  const out = [];
+  const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+  let m;
+  while ((m = re.exec(body)) !== null) out.push(m[1]);
+  return out;
+}
+function gzExtractLists(body){
+  const out = [];
+  const re = /<(ol|ul)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+  let m;
+  while ((m = re.exec(body)) !== null){
+    const items = [];
+    const itemRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+    let im;
+    while ((im = itemRe.exec(m[2])) !== null){
+      const t = im[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (t) items.push(t);
+    }
+    if (items.length >= 2) out.push({ type: m[1].toLowerCase(), items: items });
+  }
+  return out;
+}
+function gzFirstSentences(text, n){
+  const plain = String(text || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  if (!plain) return '';
+  const parts = plain.split(/(?<=[.!?])\s+(?=[A-Z"'(])/);
+  return parts.slice(0, n || 2).join(' ').trim();
+}
+
+// Find a `<strong>term</strong>` followed by ":" or "is/are" definition, in a paragraph.
+function gzExtractDefinitions(html){
+  const out = [];
+  const norm = String(html || '').replace(/\s+/g, ' ');
+  const re = /<strong\b[^>]*>([^<]{3,40})<\/strong>\s*(?:\(<em>[^<]+<\/em>\))?\s*([:—\-]|\bis\b|\bare\b|\bmeans\b|\brefers? to\b)\s+([^<.!?]{15,200}[.!?])/gi;
+  let m;
+  while ((m = re.exec(norm)) !== null){
+    const term = m[1].replace(/&amp;/g,'&').trim();
+    const def  = m[3].replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().replace(/[.!?]$/, '');
+    if (def.length < 12 || def.length > 200) continue;
+    if (/[.!?]\s/.test(term)) continue;
+    out.push({ term: term, def: def });
+  }
+  // Dedupe by term
+  const seen = new Set();
+  return out.filter(function(c){
+    const k = c.term.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /* ---------- deck + card generation ---------- */
 let GIZMO_DECKS = null;          // [{ id, paper, topicId, title, cards:[card,...] }]
 let GIZMO_ALL_CARDS = [];        // flat
-let GIZMO_SCHOLAR_POOL = [];     // distinct scholar names for MCQ distractors
+let GIZMO_DEF_POOL = [];         // {term, def, paper} pool for MCQ distractors
 const CARDS_PER_DECK = 50;
 
 function gzCard(deckCtx, kind, suffix, fields){
@@ -158,7 +225,7 @@ function gzCard(deckCtx, kind, suffix, fields){
 function buildDecks(){
   GIZMO_DECKS = [];
   GIZMO_ALL_CARDS = [];
-  const scholarSet = new Set();
+  GIZMO_DEF_POOL = [];
   ['01','02','03'].forEach(function(paperId){
     const paper = (typeof CONTENT !== 'undefined' && CONTENT[paperId]) || null;
     if (!paper || !paper.topics) return;
@@ -172,159 +239,199 @@ function buildDecks(){
         cards: []
       };
 
-      // --- Scholar cards: forward (name->position), reverse (position->name), context fact, and a self-cloze
-      (t.scholars || []).forEach(function(s, i){
-        if (!s.pos || s.pos.length < 18) return;
-        scholarSet.add(s.name);
-        // Forward: name -> position
-        deck.cards.push(gzCard(deck, 'scholar', i + 'f', {
-          front: s.name,
-          back: s.pos,
-          prompt: 'Summarise the position of ' + s.name + '.',
-          answer: null,
-          typeable: false,
-          mcqAnswer: s.name
+      // ===== AO2 thesis (the "A★ verdict" — always present) =====
+      if (t.thesis && t.thesis.line){
+        deck.cards.push(gzCard(deck, 'thesis', '', {
+          ao: 'AO2',
+          front: 'A★ thesis verdict — ' + deck.topicTitlePlain,
+          back: gzStripHtml(t.thesis.line),
+          prompt: 'State the A★ thesis verdict for ' + deck.topicTitlePlain + '.',
+          typeable: false
         }));
-        // Reverse: position -> name (typeable)
-        deck.cards.push(gzCard(deck, 'scholar', i + 'r', {
-          front: '"' + s.pos + '"',
-          back: s.name,
-          prompt: 'Whose position is this?\n“' + s.pos + '”',
-          answer: s.name,
-          typeable: true,
-          mcqAnswer: s.name,
-          mcqPrompt: s.pos
-        }));
-        // Context fact: scholar -> topic
-        deck.cards.push(gzCard(deck, 'scholar', i + 't', {
-          front: 'Topic associated with ' + s.name,
-          back: deck.topicTitlePlain + ' (Paper ' + paperId + ')',
-          prompt: 'Which H573 topic is ' + s.name + ' associated with?',
-          answer: deck.topicTitlePlain,
-          typeable: true
-        }));
-        // Self-cloze: blank out scholar surname from their own position
-        const surname = s.name.split(' ').slice(-1)[0];
-        if (surname.length > 2 && s.pos.indexOf(surname) !== -1){
-          const blanked = s.pos.replace(new RegExp('\\b' + surname.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b','g'), '_____');
-          if (blanked !== s.pos){
-            deck.cards.push(gzCard(deck, 'cloze', i + 'sn', {
-              front: blanked,
-              back: surname,
-              prompt: blanked,
-              answer: surname,
-              full: s.pos,
-              typeable: true,
-              mcqAnswer: surname,
-              mcqPrompt: blanked
-            }));
-          }
-        }
-        // Year cloze: if position contains a 4-digit year, blank it
-        const yearMatch = s.pos.match(/\b(1[6-9]\d{2}|20\d{2})\b/);
-        if (yearMatch){
-          const yearBlanked = s.pos.replace(yearMatch[0], '_____');
-          deck.cards.push(gzCard(deck, 'cloze', i + 'y', {
-            front: yearBlanked,
-            back: yearMatch[0],
-            prompt: 'Fill the year:\n' + yearBlanked,
-            answer: yearMatch[0],
-            full: s.pos,
-            typeable: true
+        if (t.thesis.unpacking){
+          deck.cards.push(gzCard(deck, 'thesis-unpack', '', {
+            ao: 'AO2',
+            front: 'Unpack the A★ verdict — ' + deck.topicTitlePlain,
+            back: gzStripHtml(t.thesis.unpacking),
+            prompt: 'Unpack (in 2-3 sentences) why the A★ verdict holds for ' + deck.topicTitlePlain + '.',
+            typeable: false
           }));
         }
-        // Quoted-phrase cloze: blank out the first quoted phrase in the position
-        const quoteRe = /['‘"“]([^'‘"”’]{6,80})['’"”]/;
-        const qm = s.pos.match(quoteRe);
-        if (qm){
-          const quoted = qm[1];
-          const qBlanked = s.pos.replace(qm[0], '"_____"');
-          deck.cards.push(gzCard(deck, 'cloze', i + 'q', {
-            front: qBlanked,
-            back: quoted,
-            prompt: s.name + ' coined this phrase — fill the gap:\n' + qBlanked,
-            answer: quoted,
-            full: s.pos,
-            typeable: true
+      }
+
+      // ===== AO1 — Concept explanations from <h3>/<h4> sections =====
+      const ao1Sections = gzParseSections(t.ao1 || '');
+      ao1Sections.forEach(function(sec, i){
+        const paragraphs = gzExtractParagraphs(sec.body);
+        paragraphs.forEach(function(p, pi){
+          const summary = gzFirstSentences(p, pi === 0 ? 2 : 1);
+          if (summary.length < 30) return;
+          deck.cards.push(gzCard(deck, 'ao1-concept', i + '_' + pi, {
+            ao: 'AO1',
+            front: pi === 0
+              ? 'AO1 — Explain: ' + sec.heading
+              : 'AO1 — ' + sec.heading + ' (point ' + (pi + 1) + ')',
+            back: summary,
+            prompt: pi === 0
+              ? 'Explain in 1-2 sentences: ' + sec.heading
+              : 'Give the next AO1 point on ' + sec.heading + '.',
+            typeable: false
           }));
-        }
+        });
+
+        // List cards: enumerated structures (Four Causes, Aquinas' Ways, etc.)
+        const lists = gzExtractLists(sec.body);
+        lists.forEach(function(list, li){
+          if (list.items.length < 2 || list.items.length > 8) return;
+          const itemsText = list.items.map(function(item, n){
+            return (list.type === 'ol' ? (n + 1) + '. ' : '• ') + item;
+          }).join('\n');
+          deck.cards.push(gzCard(deck, 'ao1-list', i + '_' + li, {
+            ao: 'AO1',
+            front: 'AO1 — List the ' + list.items.length + ' items: ' + sec.heading,
+            back: itemsText,
+            prompt: 'List the ' + list.items.length + ' items under: ' + sec.heading,
+            isList: true,
+            typeable: false
+          }));
+          // Per-item recall cards: "What is the Nth item under {section}?"
+          list.items.forEach(function(item, n){
+            if (item.length < 8 || item.length > 160) return;
+            // Try to extract a short label from "Label: rest" or "<strong>Label</strong>"
+            const labelMatch = item.match(/^([A-Za-z][^:]{2,40}):\s+(.+)$/);
+            if (labelMatch){
+              const label = labelMatch[1].trim();
+              const rest  = labelMatch[2].trim();
+              deck.cards.push(gzCard(deck, 'ao1-list', i + '_' + li + '_' + n + 'l', {
+                ao: 'AO1',
+                front: 'AO1 — ' + sec.heading + ': what is "' + label + '"?',
+                back: rest,
+                prompt: 'In the context of ' + sec.heading + ', define ' + label + '.',
+                typeable: false
+              }));
+            } else {
+              deck.cards.push(gzCard(deck, 'ao1-list', i + '_' + li + '_' + n, {
+                ao: 'AO1',
+                front: 'AO1 — ' + sec.heading + ': item ' + (n + 1),
+                back: item,
+                prompt: 'Recall item ' + (n + 1) + ' under: ' + sec.heading,
+                typeable: false
+              }));
+            }
+          });
+        });
       });
 
-      // --- Small fixed-set cards (always kept): quote, thesis, spec, exam
+      // ===== AO2 — Critique explanations from <h3>/<h4> sections =====
+      const ao2Sections = gzParseSections(t.ao2 || '');
+      ao2Sections.forEach(function(sec, i){
+        const paragraphs = gzExtractParagraphs(sec.body);
+        paragraphs.forEach(function(p, pi){
+          const summary = gzFirstSentences(p, pi === 0 ? 2 : 1);
+          if (summary.length < 30) return;
+          deck.cards.push(gzCard(deck, 'ao2-critique', i + '_' + pi, {
+            ao: 'AO2',
+            front: pi === 0
+              ? 'AO2 — ' + sec.heading
+              : 'AO2 — ' + sec.heading + ' (move ' + (pi + 1) + ')',
+            back: summary,
+            prompt: pi === 0
+              ? 'Evaluate (1-2 sentences): ' + sec.heading
+              : 'Give the next critical move on ' + sec.heading + '.',
+            typeable: false
+          }));
+        });
+      });
+
+      // ===== AO2 — break the thesis unpacking into one card per argument =====
+      if (t.thesis && t.thesis.unpacking){
+        const parts = gzStripHtml(t.thesis.unpacking).split(/(?<=[.!?])\s+(?=[A-Z])/);
+        parts.forEach(function(p, i){
+          const txt = p.trim();
+          if (txt.length < 35 || txt.length > 260) return;
+          if (i === 0) return;                 // first sentence is already the thesis-unpack card
+          deck.cards.push(gzCard(deck, 'ao2-critique', 'u' + i, {
+            ao: 'AO2',
+            front: 'AO2 — Next argument supporting the A★ verdict on ' + deck.topicTitlePlain,
+            back: txt,
+            prompt: 'Give AO2 argument #' + (i + 1) + ' supporting the verdict on ' + deck.topicTitlePlain + '.',
+            typeable: false
+          }));
+        });
+      }
+
+      // ===== AO1 — orientation sentences (the topic's framing) =====
+      if (t.orientation){
+        const parts = gzStripHtml(t.orientation).split(/(?<=[.!?])\s+(?=[A-Z])/);
+        parts.forEach(function(p, i){
+          const txt = p.trim();
+          if (txt.length < 40 || txt.length > 240) return;
+          deck.cards.push(gzCard(deck, 'ao1-concept', 'o' + i, {
+            ao: 'AO1',
+            front: 'AO1 — Frame the debate: ' + deck.topicTitlePlain + ' (point ' + (i + 1) + ')',
+            back: txt,
+            prompt: 'Frame the debate on ' + deck.topicTitlePlain + ' (give framing point #' + (i + 1) + ').',
+            typeable: false
+          }));
+        });
+      }
+
+      // ===== AO1 — Term definitions ("<strong>X</strong>: Y" pattern) =====
+      const defs = gzExtractDefinitions((t.ao1 || '') + ' ' + (t.ao2 || ''));
+      defs.forEach(function(d, i){
+        deck.cards.push(gzCard(deck, 'ao1-define', i, {
+          ao: 'AO1',
+          front: 'AO1 — Define: ' + d.term,
+          back: d.def,
+          prompt: 'Define in your own words: ' + d.term,
+          answer: d.def,
+          typeable: false                        // free-recall definitions
+        }));
+        GIZMO_DEF_POOL.push({ term: d.term, def: d.def, paper: paperId });
+      });
+
+      // ===== AO1 — Quote source (still useful: OCR rewards named sources) =====
       if (t.quote && t.quote.text && t.quote.cite){
         const cite = t.quote.cite;
         const author = cite.split(/[,–—-]/)[0].trim();
         deck.cards.push(gzCard(deck, 'quote', 'q', {
+          ao: 'AO1',
           front: '"' + t.quote.text + '"',
           back: cite,
           prompt: 'Who is the source of this quote?\n“' + t.quote.text + '”',
           answer: author,
           full: t.quote.text + ' — ' + cite,
-          typeable: true
-        }));
-        deck.cards.push(gzCard(deck, 'quote', 'qr', {
-          front: 'Quote attributed to: ' + cite,
-          back: t.quote.text,
-          prompt: 'Cite the quote attributed to ' + cite + '.',
-          answer: t.quote.text.slice(0, 80),
-          typeable: false
-        }));
-      }
-      if (t.thesis && t.thesis.line){
-        deck.cards.push(gzCard(deck, 'thesis', '', {
-          front: 'A★ thesis line for ' + deck.topicTitlePlain,
-          back: gzStripHtml(t.thesis.line),
-          prompt: 'State the A★ thesis line for ' + deck.topicTitlePlain + '.',
-          answer: null,
-          typeable: false
-        }));
-      }
-      (t.spec || []).forEach(function(sp, i){
-        deck.cards.push(gzCard(deck, 'spec', i, {
-          front: 'Spec keyword: ' + sp,
-          back: deck.topicTitlePlain,
-          prompt: 'Which H573 topic does this spec keyword belong to?\n«' + sp + '»',
-          answer: deck.topicTitlePlain,
-          typeable: false
-        }));
-      });
-      if (t.exam){
-        deck.cards.push(gzCard(deck, 'exam', '', {
-          front: t.exam,
-          back: deck.topicTitlePlain + ' (Paper ' + paperId + ')',
-          prompt: 'Which topic does this past-paper question belong to?\n' + t.exam,
-          answer: deck.topicTitlePlain,
-          typeable: false
+          typeable: true,
+          mcqAnswer: author,
+          mcqPrompt: t.quote.text
         }));
       }
 
-      // --- Variable-length cards (trimmable): headings + clozes
-      const variable = [];
-      const headingRe = /<(h[34])\b[^>]*>([^<]{4,120})<\/\1>/gi;
-      const headings = new Set();
-      [t.ao1 || '', t.ao2 || ''].forEach(function(src){
-        let hm;
-        while ((hm = headingRe.exec(src)) !== null){
-          const txt = hm[2].replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').trim();
-          if (txt.length >= 4 && txt.length <= 90 && !headings.has(txt.toLowerCase())) headings.add(txt);
-        }
-      });
-      let hi = 0;
-      headings.forEach(function(h){
-        if (hi >= 5) return;
-        variable.push(gzCard(deck, 'heading', hi, {
-          front: 'Section heading: "' + h + '"',
-          back: deck.topicTitlePlain,
-          prompt: 'Which H573 topic contains the section heading:\n"' + h + '"?',
-          answer: deck.topicTitlePlain,
-          typeable: true
+      // ===== AO1 + AO2 — Cloze fill-the-gap from <strong>/<em> across the topic =====
+      const ao1Clozes = gzExtractClozes(t.ao1 || '');
+      const ao2Clozes = gzExtractClozes(t.ao2 || '');
+      const seenAnswers = new Set(deck.cards.filter(function(c){ return c.answer; }).map(function(c){ return c.answer.toLowerCase(); }));
+      const clozeCards = [];
+      ao1Clozes.forEach(function(c, i){
+        if (seenAnswers.has(c.answer.toLowerCase())) return;
+        seenAnswers.add(c.answer.toLowerCase());
+        clozeCards.push(gzCard(deck, 'ao1-cloze', i, {
+          ao: 'AO1',
+          front: c.prompt,
+          back: c.answer,
+          prompt: c.prompt,
+          answer: c.answer,
+          full: c.full,
+          typeable: true,
+          mcqAnswer: c.answer,
+          mcqPrompt: c.prompt
         }));
-        hi++;
       });
-      const sources = [t.orientation || '', t.ao1 || '', t.ao2 || '', (t.thesis && t.thesis.unpacking) || '', (t.thesis && t.thesis.line) || ''];
-      const clozes = gzExtractClozes(sources.join(' || '));
-      clozes.forEach(function(c, i){
-        variable.push(gzCard(deck, 'cloze', i, {
+      ao2Clozes.forEach(function(c, i){
+        if (seenAnswers.has(c.answer.toLowerCase())) return;
+        seenAnswers.add(c.answer.toLowerCase());
+        clozeCards.push(gzCard(deck, 'ao2-cloze', i, {
+          ao: 'AO2',
           front: c.prompt,
           back: c.answer,
           prompt: c.prompt,
@@ -336,18 +443,37 @@ function buildDecks(){
         }));
       });
 
-      // Add as many variable cards as fit under the cap
+      // ===== Orientation cloze (framing of the topic) =====
+      if (t.orientation){
+        const oClozes = gzExtractClozes('<p>' + t.orientation + '</p>');
+        oClozes.forEach(function(c, i){
+          if (seenAnswers.has(c.answer.toLowerCase())) return;
+          seenAnswers.add(c.answer.toLowerCase());
+          clozeCards.push(gzCard(deck, 'ao1-cloze', 'o' + i, {
+            ao: 'AO1',
+            front: c.prompt,
+            back: c.answer,
+            prompt: c.prompt,
+            answer: c.answer,
+            full: c.full,
+            typeable: true,
+            mcqAnswer: c.answer,
+            mcqPrompt: c.prompt
+          }));
+        });
+      }
+
+      // Add clozes until cap is reached
       const room = Math.max(0, CARDS_PER_DECK - deck.cards.length);
-      deck.cards = deck.cards.concat(variable.slice(0, room));
-      // If still under cap and we have extra clozes, that's fine — they were trimmed
+      deck.cards = deck.cards.concat(clozeCards.slice(0, room));
       if (deck.cards.length > CARDS_PER_DECK) deck.cards = deck.cards.slice(0, CARDS_PER_DECK);
+
       if (deck.cards.length){
         GIZMO_DECKS.push(deck);
         GIZMO_ALL_CARDS = GIZMO_ALL_CARDS.concat(deck.cards);
       }
     });
   });
-  GIZMO_SCHOLAR_POOL = Array.from(scholarSet);
 }
 
 /* ---------- SM-2 lite scheduler ----------
@@ -834,13 +960,19 @@ function renderSessionCard(){
 
 function gzCardLabels(card){
   switch (card.type){
-    case 'scholar': return { front: 'Scholar', back: 'Position', tap: 'Tap to reveal their position' };
-    case 'cloze':   return { front: 'Fill the gap', back: 'Answer', tap: 'Tap to reveal the missing term' };
-    case 'quote':   return { front: 'Quote', back: 'Source', tap: 'Tap to reveal the source' };
-    case 'thesis':  return { front: 'Thesis prompt', back: 'A★ thesis line', tap: 'Tap to reveal the model line' };
-    case 'spec':    return { front: 'Spec keyword', back: 'Topic', tap: 'Tap to reveal the topic' };
-    case 'exam':    return { front: 'Exam question', back: 'Topic', tap: 'Tap to reveal the topic' };
-    default:        return { front: 'Front', back: 'Back', tap: 'Tap to reveal' };
+    case 'ao1-concept':  return { front: 'AO1 · Concept',     back: 'Explanation',        tap: 'Tap to reveal the explanation' };
+    case 'ao1-list':     return { front: 'AO1 · List',        back: 'Items',              tap: 'Tap to reveal the items' };
+    case 'ao1-define':   return { front: 'AO1 · Definition',  back: 'Definition',         tap: 'Tap to reveal the definition' };
+    case 'ao1-cloze':    return { front: 'AO1 · Fill the gap', back: 'Answer',            tap: 'Tap to reveal the missing term' };
+    case 'ao2-critique': return { front: 'AO2 · Evaluation',  back: 'Critical move',      tap: 'Tap to reveal the move' };
+    case 'ao2-cloze':    return { front: 'AO2 · Fill the gap', back: 'Answer',            tap: 'Tap to reveal the missing term' };
+    case 'thesis':       return { front: 'AO2 · Thesis',      back: 'A★ thesis verdict',  tap: 'Tap to reveal the verdict' };
+    case 'thesis-unpack':return { front: 'AO2 · Thesis why',  back: 'Unpacking',          tap: 'Tap to reveal the unpacking' };
+    case 'quote':        return { front: 'AO1 · Quote',       back: 'Source',             tap: 'Tap to reveal the source' };
+    // legacy types (still rendered if old state references them)
+    case 'cloze':        return { front: 'Fill the gap',      back: 'Answer',             tap: 'Tap to reveal the missing term' };
+    case 'scholar':      return { front: 'Scholar',           back: 'Position',           tap: 'Tap to reveal' };
+    default:             return { front: 'Front',             back: 'Back',               tap: 'Tap to reveal' };
   }
 }
 
@@ -865,11 +997,14 @@ function renderStudyCard(card, body){
     if (flipped) return;
     flipped = true;
     cardEl.classList.add('flipped');
-    const isQuoteLike = (card.type === 'scholar' || card.type === 'quote');
+    const isQuoteLike = (card.type === 'quote');
     const wrap = isQuoteLike ? ['&ldquo;', '&rdquo;'] : ['', ''];
+    const backHtml = card.isList
+      ? '<div class="gizmo-card-back list-back">' + gzEsc(card.back).replace(/\n/g, '<br>') + '</div>'
+      : '<div class="gizmo-card-back">' + wrap[0] + gzEsc(card.back) + wrap[1] + '</div>';
     cardEl.innerHTML =
       '<div class="gizmo-card-side">' + lbl.back + '</div>' +
-      '<div class="gizmo-card-back">' + wrap[0] + gzEsc(card.back) + wrap[1] + '</div>' +
+      backHtml +
       '<div class="gizmo-card-context">' + gzEsc(card.context) + '</div>';
     document.querySelectorAll('.gizmo-grade-btn').forEach(function(b){ b.classList.remove('dim'); });
   });
@@ -895,26 +1030,15 @@ function renderStudyCard(card, body){
 function renderQuizCard(card, body){
   const correct = card.mcqAnswer || card.back;
   const promptText = card.mcqPrompt || card.back;
-  // distractor pool: same answer type from same paper, else global pool
-  let pool;
-  if (card.type === 'cloze'){
+  // Pull distractors from same-type MCQ-able cards in the same paper, then any paper
+  const isClozeLike = card.type === 'ao1-cloze' || card.type === 'ao2-cloze' || card.type === 'cloze';
+  let pool = GIZMO_ALL_CARDS
+    .filter(function(c){ return c.paper === card.paper && c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase() && (isClozeLike ? (c.type === 'ao1-cloze' || c.type === 'ao2-cloze' || c.type === 'cloze') : true); })
+    .map(function(c){ return c.mcqAnswer; });
+  if (pool.length < 3){
     pool = GIZMO_ALL_CARDS
-      .filter(function(c){ return c.type === 'cloze' && c.paper === card.paper && c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase(); })
+      .filter(function(c){ return c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase(); })
       .map(function(c){ return c.mcqAnswer; });
-    if (pool.length < 3) pool = GIZMO_ALL_CARDS
-      .filter(function(c){ return c.type === 'cloze' && c.mcqAnswer && c.mcqAnswer.toLowerCase() !== correct.toLowerCase(); })
-      .map(function(c){ return c.mcqAnswer; });
-  } else {
-    pool = GIZMO_DECKS
-      .filter(function(d){ return d.paper === card.paper; })
-      .reduce(function(acc, d){
-        d.cards.forEach(function(c){
-          if (c.mcqAnswer && c.mcqAnswer !== correct && c.type === 'scholar') acc.add(c.mcqAnswer);
-        });
-        return acc;
-      }, new Set());
-    pool = Array.from(pool);
-    if (pool.length < 3) pool = GIZMO_SCHOLAR_POOL.filter(function(n){ return n !== correct; });
   }
   // dedupe + shuffle
   pool = Array.from(new Set(pool));
@@ -927,11 +1051,15 @@ function renderQuizCard(card, body){
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = options[i]; options[i] = options[j]; options[j] = tmp;
   }
-  const questionHead = card.type === 'cloze' ? 'Fill the gap' : 'Whose position is this?';
+  const questionHead =
+    isClozeLike ? 'Fill the gap' :
+    card.type === 'quote' ? 'Source of this quote?' :
+    'Which answer fits?';
+  const isQuote = card.type === 'quote';
   body.innerHTML =
     '<div class="gizmo-quiz">' +
       '<div class="gizmo-quiz-prompt">' + questionHead + '</div>' +
-      '<div class="gizmo-quiz-q">' + (card.type === 'cloze' ? gzEsc(promptText) : '&ldquo;' + gzEsc(promptText) + '&rdquo;') + '</div>' +
+      '<div class="gizmo-quiz-q">' + (isQuote ? '&ldquo;' + gzEsc(promptText) + '&rdquo;' : gzEsc(promptText)) + '</div>' +
       '<div class="gizmo-quiz-opts">' +
         options.map(function(o){ return '<button class="gizmo-quiz-opt" data-opt="' + gzEsc(o) + '">' + gzEsc(o) + '</button>'; }).join('') +
       '</div>' +
