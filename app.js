@@ -569,14 +569,15 @@ function renderMarker(paper){
 }
 
 function detectInEssay(essay, question){
-  if (!essay || essay.trim().length < 50){
-    return { wordCount: 0, paragraphs: 0, scholars: [], technicalTerms: [], counterMoves: [], thesisMarkers: [], verdictMarkers: [], evaluationMarkers: [], hasIntro: false, hasConclusion: false, questionTermsHit: 0, questionTermTotal: 0, topicSentenceFocus: 0, embeddedEvaluation: 0, dialecticalPairs: 0 };
-  }
+  const empty = { wordCount: 0, paragraphs: 0, bodyParaCount: 0, scholars: [], scholarsArgumentative: [], technicalTerms: [], counterMoves: [], thesisMarkers: [], verdictMarkers: [], evaluationMarkers: [], hasIntro: false, hasConclusion: false, conclusionTiesBack: false, questionTermsHit: 0, questionTermTotal: 0, topicSentenceFocus: 0, embeddedEvaluation: 0, dialecticalPairs: 0, paragraphsWithFullStructure: 0, sustainedReasoning: 0 };
+  if (!essay || essay.trim().length < 50) return empty;
   const text = essay.trim();
   const lower = text.toLowerCase();
   const wordCount = (text.match(/\S+/g) || []).length;
   const paragraphs = text.split(/\n\s*\n/).filter(function(p){ return p.trim().length > 30; });
   const paraCount = paragraphs.length;
+
+  /* Distinct scholars */
   const scholars = [];
   const seenSch = {};
   SCHOLAR_LIST.forEach(function(name){
@@ -584,90 +585,154 @@ function detectInEssay(essay, question){
     const re = new RegExp('\\b' + escaped + '\\b');
     if (re.test(text) && !seenSch[name]){ seenSch[name] = 1; scholars.push(name); }
   });
-  function detectIn(list){
-    return list.filter(function(p){ return lower.indexOf(p.toLowerCase()) >= 0; });
-  }
+
+  /* Argumentative deployment: scholar within 80 chars of an argumentative verb */
+  const argVerbs = ['argues','argued','arguing','claims','claimed','claim','states','stated','writes','wrote','responds','responded','objects','objected','replies','replied','reply','maintains','maintained','holds','held','defends','defended','contends','contended','criticises','criticised','criticizes','criticized','rejects','rejected','asserts','asserted','denies','denied','answers','answered','observes','observed','suggests','suggested','proposes','proposed','believes','believed','thinks','thought','disagrees','agrees','distinguishes','accepts','accepted','attacks','attacked'];
+  const verbsRe = argVerbs.join('|');
+  const scholarsArgumentative = [];
+  scholars.forEach(function(name){
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re1 = new RegExp('\\b' + esc + '\\b[^.!?]{0,80}\\b(' + verbsRe + ')\\b', 'i');
+    const re2 = new RegExp('\\b(' + verbsRe + ')\\b[^.!?]{0,80}\\b' + esc + '\\b', 'i');
+    if (re1.test(text) || re2.test(text)) scholarsArgumentative.push(name);
+  });
+
+  function detectIn(list){ return list.filter(function(p){ return lower.indexOf(p.toLowerCase()) >= 0; }); }
   const technicalTerms = detectIn(TECHNICAL_TERMS);
   const counterMoves = detectIn(COUNTER_MOVES);
   const thesisMarkers = detectIn(THESIS_MARKERS);
   const verdictMarkers = detectIn(VERDICT_MARKERS);
   const evaluationMarkers = detectIn(EVALUATION_MARKERS);
-  const stopwords = ['that','this','these','those','what','which','when','where','with','from','about','only','more','most','than','then','will','have','been','were','being','they','their','there','some','such','also','make','best','because','rather','still','show','prove','should','might','could','would','must','reliable','approach','useful','discuss','assess','evaluate','critically','extent'];
+
+  /* Question term coverage */
+  const stopwords = ['that','this','these','those','what','which','when','where','with','from','about','only','more','most','than','then','will','have','been','were','being','they','their','there','some','such','also','make','best','because','rather','still','show','prove','should','might','could','would','must','reliable','approach','useful','discuss','assess','evaluate','critically','extent','view','really','simply','provide','provides','only','have','will','convincing'];
   const qWords = (question.toLowerCase().match(/[a-z]+/g) || []);
   const qTerms = [];
   qWords.forEach(function(w){ if (w.length >= 4 && stopwords.indexOf(w) < 0 && qTerms.indexOf(w) < 0) qTerms.push(w); });
   const questionTermsHit = qTerms.filter(function(t){ return lower.indexOf(t) >= 0; }).length;
+
+  /* Intro / conclusion */
   const firstPara = paragraphs[0] || '';
   const lastPara = paragraphs[paraCount - 1] || '';
-  const hasIntro = firstPara.length > 100 && THESIS_MARKERS.some(function(m){ return firstPara.toLowerCase().indexOf(m) >= 0; });
-  const hasConclusion = lastPara.length > 80 && VERDICT_MARKERS.some(function(m){ return lastPara.toLowerCase().indexOf(m) >= 0; });
+  const firstPL = firstPara.toLowerCase();
+  const lastPL = lastPara.toLowerCase();
+  const hasIntro = firstPara.length > 100 && THESIS_MARKERS.some(function(m){ return firstPL.indexOf(m) >= 0; });
+  const hasConclusion = lastPara.length > 80 && VERDICT_MARKERS.some(function(m){ return lastPL.indexOf(m) >= 0; });
+  /* Conclusion must mention 2+ key question terms to count as "ties back" */
+  const conclusionTiesBack = hasConclusion && qTerms.filter(function(t){ return lastPL.indexOf(t) >= 0; }).length >= 2;
+
+  /* Body paragraphs — track richer structure */
   const bodyParas = paragraphs.slice(1, Math.max(1, paraCount - 1));
-  let dialecticalPairs = 0, evaluationParas = 0, topicFocus = 0;
+  let dialecticalPairs = 0;
+  let evaluationParas = 0;
+  let topicFocus = 0;
+  let paragraphsWithFullStructure = 0;
+  const reasonWords = ['because','since','therefore','thus','hence','consequently','it follows','this means','this implies','this shows'];
   bodyParas.forEach(function(p){
     const pl = p.toLowerCase();
-    if (COUNTER_MOVES.some(function(m){ return pl.indexOf(m) >= 0; }) && p.length > 250) dialecticalPairs++;
-    if (EVALUATION_MARKERS.some(function(m){ return pl.indexOf(m) >= 0; })) evaluationParas++;
-    const firstSentence = (p.match(/^[^.!?]+[.!?]/) || [p.substring(0, 200)])[0].toLowerCase();
-    const qHit = qTerms.filter(function(t){ return firstSentence.indexOf(t) >= 0; }).length;
-    const stance = ['fails','succeeds','works','argues','rejects','supports','undermines','objects','challenges','defends','however','although','strength','weakness','convincing'];
-    const hasStance = stance.some(function(s){ return firstSentence.indexOf(s) >= 0; });
-    if (qHit >= 1 || hasStance) topicFocus++;
+    const hasCounter = COUNTER_MOVES.some(function(m){ return pl.indexOf(m) >= 0; });
+    const hasEval = EVALUATION_MARKERS.some(function(m){ return pl.indexOf(m) >= 0; });
+    const hasScholar = scholars.some(function(n){ return p.indexOf(n) >= 0; });
+    const hasReasoning = reasonWords.some(function(m){ return pl.indexOf(m) >= 0; });
+    /* Substantive counter — has counter-word AND length > 250 */
+    if (hasCounter && p.length > 250) dialecticalPairs++;
+    /* Real evaluation — has eval marker AND reasoning OR counter */
+    if (hasEval && (hasReasoning || hasCounter)) evaluationParas++;
+    /* Full paragraph structure — claim + scholar + evaluation + reasoning + substantial length */
+    if (hasScholar && hasEval && hasReasoning && p.length > 180) paragraphsWithFullStructure++;
+    /* Topic sentence focus */
+    const sentences = p.split(/[.!?]+/).filter(function(s){ return s.trim().length > 0; });
+    const firstSent = ((sentences[0] || p.substring(0, 200)) + '').toLowerCase();
+    const qHitInTopic = qTerms.filter(function(t){ return firstSent.indexOf(t) >= 0; }).length;
+    const stanceWords = ['fails','succeeds','works','rejects','supports','undermines','objects','challenges','defends','however','although','whilst','while','nevertheless','strength','weakness','crucially','significantly','decisive','sharpest','only if','only when'];
+    const hasStance = stanceWords.some(function(s){ return firstSent.indexOf(s) >= 0; });
+    if (qHitInTopic >= 1 || hasStance) topicFocus++;
   });
   const bodyCount = bodyParas.length || 1;
+
+  /* Sustained reasoning: how many distinctive intro words recur 2+ times in body */
+  let sustainedReasoning = 0;
+  if (firstPara.length > 100 && paraCount >= 3){
+    const introWords = (firstPL.match(/[a-z]+/g) || []).filter(function(w){ return w.length >= 6 && stopwords.indexOf(w) < 0; });
+    const introUnique = Array.from(new Set(introWords)).slice(0, 20);
+    const restText = paragraphs.slice(1).join(' ').toLowerCase();
+    sustainedReasoning = introUnique.filter(function(w){
+      const m = restText.match(new RegExp('\\b' + w + '\\b', 'g'));
+      return m && m.length >= 2;
+    }).length;
+  }
+
   return {
-    wordCount: wordCount, paragraphs: paraCount, scholars: scholars,
+    wordCount: wordCount, paragraphs: paraCount, bodyParaCount: bodyCount,
+    scholars: scholars, scholarsArgumentative: scholarsArgumentative,
     technicalTerms: technicalTerms, counterMoves: counterMoves,
-    thesisMarkers: thesisMarkers, verdictMarkers: verdictMarkers,
-    evaluationMarkers: evaluationMarkers,
-    hasIntro: hasIntro, hasConclusion: hasConclusion,
+    thesisMarkers: thesisMarkers, verdictMarkers: verdictMarkers, evaluationMarkers: evaluationMarkers,
+    hasIntro: hasIntro, hasConclusion: hasConclusion, conclusionTiesBack: conclusionTiesBack,
     questionTermsHit: questionTermsHit, questionTermTotal: qTerms.length,
     dialecticalPairs: dialecticalPairs,
     embeddedEvaluation: evaluationParas / bodyCount,
-    topicSentenceFocus: topicFocus / bodyCount
+    topicSentenceFocus: topicFocus / bodyCount,
+    paragraphsWithFullStructure: paragraphsWithFullStructure,
+    sustainedReasoning: sustainedReasoning
   };
 }
 
+/* AO1 = Knowledge & Understanding. Criterion-based: each level requires ALL of:
+   - scholars argumentatively deployed (not just named)
+   - technical terms in context
+   - sufficient length to demonstrate detail
+   - question focus throughout (not just topic-word coverage)
+   Returns suggested level 1-6.
+*/
 function suggestAO1(d){
   if (d.wordCount === 0) return 1;
-  const breadth = Math.min(4, d.scholars.length);
-  const depth = Math.min(4, d.technicalTerms.length);
-  const len = d.wordCount < 200 ? 0 : d.wordCount < 300 ? 1 : d.wordCount < 450 ? 2 : d.wordCount < 600 ? 3 : 4;
+  const argScholars = d.scholarsArgumentative.length;
+  const tech = d.technicalTerms.length;
+  const words = d.wordCount;
   const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
   const tsf = d.topicSentenceFocus;
-  const focus = Math.round((qc * 0.3 + tsf * 0.7) * 4);
-  let total = breadth + depth + len + focus;
-  if (d.wordCount >= 500 && tsf < 0.25) total -= 4;
-  if (total >= 16) return 6;
-  if (total >= 13) return 5;
-  if (total >= 10) return 4;
-  if (total >= 7) return 3;
-  if (total >= 4) return 2;
+  /* Question focus combined: TSF weighted (deeper signal) plus coverage */
+  const focus = qc * 0.3 + tsf * 0.7;
+  /* Each level requires ALL criteria. Order: check L6 down */
+  if (argScholars >= 5 && tech >= 6 && words >= 600 && focus >= 0.6 && tsf >= 0.5) return 6;
+  if (argScholars >= 4 && tech >= 5 && words >= 500 && focus >= 0.5 && tsf >= 0.4) return 5;
+  if (argScholars >= 3 && tech >= 3 && words >= 400 && focus >= 0.35) return 4;
+  if (argScholars >= 2 && tech >= 2 && words >= 280 && focus >= 0.2) return 3;
+  if ((argScholars >= 1 || tech >= 1) && words >= 150) return 2;
   return 1;
 }
 
+/* AO2 = Analysis & Evaluation. Criterion-based: each level requires:
+   - paragraphs with full claim+scholar+reasoning+evaluation structure
+   - dialectical engagement (counter-moves with substance)
+   - sustained reasoning across paragraphs (thesis recurrence)
+   - clear thesis in intro, decisive conclusion that ties back
+   - question focus throughout
+*/
 function suggestAO2(d){
   if (d.wordCount === 0) return 1;
-  let structure = 0;
-  if (d.hasIntro) structure++;
-  if (d.thesisMarkers.length >= 2) structure++;
-  if (d.hasConclusion) structure++;
-  if (d.verdictMarkers.length >= 2) structure++;
-  const sustained = Math.round(d.embeddedEvaluation * 5);
-  const dialogue = Math.min(4, d.dialecticalPairs * 2);
+  const fullStruct = d.paragraphsWithFullStructure;
+  const dial = d.dialecticalPairs;
+  const sustained = d.sustainedReasoning;
+  const embedded = d.embeddedEvaluation;
+  const words = d.wordCount;
   const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
   const tsf = d.topicSentenceFocus;
-  const focus = Math.round((qc * 0.3 + tsf * 0.7) * 3);
-  let total = structure + sustained + dialogue + focus;
-  if (d.wordCount >= 500 && tsf < 0.25) total -= 4;
-  let level;
-  if (total >= 16) level = 6;
-  else if (total >= 13) level = 5;
-  else if (total >= 10) level = 4;
-  else if (total >= 7) level = 3;
-  else if (total >= 4) level = 2;
-  else level = 1;
-  const lengthFloor = d.wordCount < 150 ? 1 : d.wordCount < 250 ? 2 : d.wordCount < 350 ? 3 : d.wordCount < 500 ? 4 : d.wordCount < 650 ? 5 : 6;
-  return Math.min(level, lengthFloor);
+  const focus = qc * 0.3 + tsf * 0.7;
+  const hasIntro = d.hasIntro;
+  const hasConc = d.hasConclusion;
+  const ties = d.conclusionTiesBack;
+  /* L6: confident sustained argument, precise question focus, every paragraph evaluates */
+  if (fullStruct >= 3 && dial >= 2 && sustained >= 5 && hasIntro && ties && embedded >= 0.7 && focus >= 0.55 && tsf >= 0.55 && words >= 600) return 6;
+  /* L5: well-developed sustained reasoning, good dialectic */
+  if (fullStruct >= 2 && dial >= 2 && sustained >= 3 && hasIntro && hasConc && embedded >= 0.55 && focus >= 0.45 && words >= 500) return 5;
+  /* L4: general success, well-developed but maybe uneven */
+  if (fullStruct >= 1 && dial >= 1 && hasConc && embedded >= 0.4 && focus >= 0.35 && words >= 380) return 4;
+  /* L3: partially successful, some structure */
+  if (dial >= 1 && embedded >= 0.25 && words >= 260) return 3;
+  /* L2: some argument attempted */
+  if (embedded >= 0.1 && words >= 150) return 2;
+  return 1;
 }
 
 function markInLevel(level, pos, levels){
@@ -706,6 +771,68 @@ function getGrade(mark){
   return 'U';
 }
 
+function diag(label, ok){
+  const icon = ok ? '<span style="color:var(--green);font-weight:700">✓</span>' : '<span style="color:var(--claret);font-weight:700">✗</span>';
+  return '<div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;padding:0.18rem 0">' + icon + '<span>' + label + '</span></div>';
+}
+function diagN(label, val, target){
+  const ok = val >= target;
+  const icon = ok ? '<span style="color:var(--green);font-weight:700">✓</span>' : '<span style="color:var(--claret);font-weight:700">' + val + '/' + target + '</span>';
+  return '<div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;padding:0.18rem 0">' + icon + '<span>' + label + (ok ? ' (' + val + ')' : '') + '</span></div>';
+}
+function diagPct(label, val, target){
+  const pct = Math.round(val * 100);
+  const tgt = Math.round(target * 100);
+  const ok = val >= target;
+  const icon = ok ? '<span style="color:var(--green);font-weight:700">✓</span>' : '<span style="color:var(--claret);font-weight:700">' + pct + '%</span>';
+  return '<div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;padding:0.18rem 0">' + icon + '<span>' + label + (ok ? ' (' + pct + '%)' : ' (target ' + tgt + '%)') + '</span></div>';
+}
+
+/* What specifically does the essay lack to reach AO1 level L? */
+function whatIsMissingAO1(d, L){
+  const reqs = {
+    6: { arg: 5, tech: 6, words: 600, tsf: 0.5, focus: 0.6 },
+    5: { arg: 4, tech: 5, words: 500, tsf: 0.4, focus: 0.5 },
+    4: { arg: 3, tech: 3, words: 400, tsf: 0,   focus: 0.35 },
+    3: { arg: 2, tech: 2, words: 280, tsf: 0,   focus: 0.2  }
+  };
+  const r = reqs[L];
+  if (!r) return [];
+  const miss = [];
+  if (d.scholarsArgumentative.length < r.arg) miss.push('deploy ' + (r.arg - d.scholarsArgumentative.length) + ' more scholar(s) argumentatively (use verbs like "argues", "responds")');
+  if (d.technicalTerms.length < r.tech) miss.push('use ' + (r.tech - d.technicalTerms.length) + ' more technical term(s)');
+  if (d.wordCount < r.words) miss.push('extend to at least ' + r.words + ' words (current ' + d.wordCount + ')');
+  if (r.tsf > 0 && d.topicSentenceFocus < r.tsf) miss.push('make ' + Math.round(r.tsf * 100) + '% of body topic sentences address the question (current ' + Math.round(d.topicSentenceFocus * 100) + '%)');
+  const focus = (d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal) * 0.3 + d.topicSentenceFocus * 0.7;
+  if (focus < r.focus) miss.push('sharpen question focus (currently ' + Math.round(focus * 100) + '%, need ' + Math.round(r.focus * 100) + '%)');
+  return miss;
+}
+
+function whatIsMissingAO2(d, L){
+  const reqs = {
+    6: { full: 3, dial: 2, sustained: 5, embedded: 0.7, focus: 0.55, intro: true, ties: true, words: 600 },
+    5: { full: 2, dial: 2, sustained: 3, embedded: 0.55, focus: 0.45, intro: true, conc: true, words: 500 },
+    4: { full: 1, dial: 1, embedded: 0.4, focus: 0.35, conc: true, words: 380 },
+    3: { dial: 1, embedded: 0.25, words: 260 }
+  };
+  const r = reqs[L];
+  if (!r) return [];
+  const miss = [];
+  if (r.full && d.paragraphsWithFullStructure < r.full) miss.push('build ' + (r.full - d.paragraphsWithFullStructure) + ' more full paragraph(s) — scholar + evaluation + reasoning together');
+  if (r.dial && d.dialecticalPairs < r.dial) miss.push('add ' + (r.dial - d.dialecticalPairs) + ' more substantive counter-move(s) (raise + answer an objection)');
+  if (r.sustained && d.sustainedReasoning < r.sustained) miss.push('thread thesis through paragraphs more clearly — currently ' + d.sustainedReasoning + ' key words recur');
+  if (r.embedded && d.embeddedEvaluation < r.embedded) miss.push('add evaluation to ' + Math.round((r.embedded - d.embeddedEvaluation) * d.bodyParaCount) + ' more body paragraph(s) (currently ' + Math.round(d.embeddedEvaluation * 100) + '%)');
+  if (r.focus){
+    const focus = (d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal) * 0.3 + d.topicSentenceFocus * 0.7;
+    if (focus < r.focus) miss.push('sharpen question focus throughout');
+  }
+  if (r.intro && !d.hasIntro) miss.push('open with a committed thesis using language like "I will argue", "ultimately", "this essay argues"');
+  if (r.conc && !d.hasConclusion) miss.push('add a clear conclusion with verdict language ("in conclusion", "ultimately", "the strongest view is")');
+  if (r.ties && !d.conclusionTiesBack) miss.push('the conclusion must mention the question\'s key terms');
+  if (r.words && d.wordCount < r.words) miss.push('extend to at least ' + r.words + ' words');
+  return miss;
+}
+
 function drawRubric(d, m){
   const rubric = document.getElementById('mk-rubric');
   if (!d || d.wordCount === 0){
@@ -738,18 +865,53 @@ function drawRubric(d, m){
   let html = '<div class="rubric-grade"><div class="rubric-grade-num ' + gradeClass + '">' + m.total + '<small>/40</small></div>' +
     '<div class="rubric-grade-band">Grade ' + grade + '</div>' +
     '<div class="rubric-grade-score">AO1 L' + m.ao1L + ' (' + m.ao1Mark + '/16) &middot; AO2 L' + m.ao2L + ' (' + m.ao2Mark + '/24)</div></div>' +
-    '<div class="lor-explainer">Marked using OCR\'s levels-of-response grid. Auto-suggested levels in italic; click any level to override based on your read of the descriptors.</div>' +
+    '<div class="lor-explainer">Levels are auto-suggested by checking specific criteria for each level (scholar deployment, technical vocabulary, paragraph structure, dialectical engagement, sustained reasoning, question focus). The marker is a heuristic, not a substitute for a teacher reading the essay — but it surfaces concrete weaknesses. Click any level to override.</div>' +
     aoBlock('ao1', 'Knowledge &amp; Understanding', m.ao1Mark, m.ao1L, m.ao1P, 16, AO1_LEVELS, m.autoAO1) +
     aoBlock('ao2', 'Analysis &amp; Evaluation', m.ao2Mark, m.ao2L, m.ao2P, 24, AO2_LEVELS, m.autoAO2);
-  if (d.scholars.length){
-    html += '<div class="detected-list"><div class="detected-list-label">Scholars detected (' + d.scholars.length + ')</div><div class="detected-tags">';
-    d.scholars.forEach(function(s){ html += '<span class="detected-tag">' + s + '</span>'; });
+  if (d.scholarsArgumentative.length){
+    html += '<div class="detected-list"><div class="detected-list-label">Scholars deployed argumentatively (' + d.scholarsArgumentative.length + ' of ' + d.scholars.length + ' named)</div><div class="detected-tags">';
+    d.scholarsArgumentative.forEach(function(s){ html += '<span class="detected-tag">' + s + '</span>'; });
+    const namedOnly = d.scholars.filter(function(s){ return d.scholarsArgumentative.indexOf(s) < 0; });
+    if (namedOnly.length){
+      html += '</div><div style="font-family:var(--ui);font-size:0.6rem;color:var(--muted);margin-top:0.3rem;font-style:italic">Named only (no argumentative verb nearby — examiners reward deployment, not name-dropping):</div><div class="detected-tags">';
+      namedOnly.forEach(function(s){ html += '<span class="detected-tag" style="background:rgba(107,29,29,0.06);color:var(--muted);border-color:var(--rule)">' + s + '</span>'; });
+    }
     html += '</div></div>';
+  } else if (d.scholars.length){
+    html += '<div class="detected-list"><div class="detected-list-label">Scholars named (' + d.scholars.length + ') — but none deployed argumentatively</div><div class="detected-tags">';
+    d.scholars.forEach(function(s){ html += '<span class="detected-tag" style="background:rgba(107,29,29,0.06);color:var(--muted)">' + s + '</span>'; });
+    html += '</div><div style="font-family:var(--ui);font-size:0.62rem;color:var(--claret);margin-top:0.4rem;font-style:italic">Tie each scholar to an argumentative verb: "Aquinas argues...", "Hume claims...", "Plantinga responds..."</div></div>';
   }
   if (d.technicalTerms.length){
     html += '<div class="detected-list"><div class="detected-list-label">Technical vocabulary (' + d.technicalTerms.length + ')</div><div class="detected-tags">';
     d.technicalTerms.slice(0, 14).forEach(function(t){ html += '<span class="detected-tag tech">' + t + '</span>'; });
     html += '</div></div>';
+  }
+  /* Structure diagnostics */
+  html += '<div class="detected-list"><div class="detected-list-label">Essay structure detected</div><div style="font-family:var(--body);font-size:0.78rem;line-height:1.7;color:var(--ink)">' +
+    diag('Intro with thesis', d.hasIntro) +
+    diag('Conclusion with verdict', d.hasConclusion) +
+    diag('Conclusion ties back to question', d.conclusionTiesBack) +
+    diagN('Body paragraphs with full structure (scholar + reasoning + evaluation)', d.paragraphsWithFullStructure, 3) +
+    diagN('Substantive dialectical pairs (counter + length)', d.dialecticalPairs, 2) +
+    diagPct('Body paragraphs evaluating, not just describing', d.embeddedEvaluation, 0.7) +
+    diagPct('Topic sentences that focus on the question', d.topicSentenceFocus, 0.55) +
+    diagN('Sustained reasoning (thesis words recurring)', d.sustainedReasoning, 5) +
+    '</div></div>';
+  /* What's missing for next level */
+  const nextAO1 = Math.min(6, m.ao1L + 1);
+  const nextAO2 = Math.min(6, m.ao2L + 1);
+  const missAO1 = whatIsMissingAO1(d, nextAO1);
+  const missAO2 = whatIsMissingAO2(d, nextAO2);
+  if ((missAO1.length || missAO2.length) && (m.ao1L < 6 || m.ao2L < 6)){
+    html += '<div class="detected-list"><div class="detected-list-label" style="color:var(--claret)">To raise the level</div><ul style="list-style:none;padding-left:0;margin:0.3rem 0;font-size:0.85rem;line-height:1.55">';
+    if (missAO1.length && m.ao1L < 6){
+      html += '<li style="margin:0.3rem 0;padding-left:1rem;position:relative"><span style="position:absolute;left:0;color:var(--claret);font-weight:700">AO1</span><span style="margin-left:1.7rem"><strong>For L' + nextAO1 + ':</strong> ' + missAO1.join('; ') + '</span></li>';
+    }
+    if (missAO2.length && m.ao2L < 6){
+      html += '<li style="margin:0.3rem 0;padding-left:1rem;position:relative"><span style="position:absolute;left:0;color:var(--ochre);font-weight:700">AO2</span><span style="margin-left:1.7rem"><strong>For L' + nextAO2 + ':</strong> ' + missAO2.join('; ') + '</span></li>';
+    }
+    html += '</ul></div>';
   }
   rubric.innerHTML = html;
   rubric.querySelectorAll('.lor-level').forEach(function(b){
