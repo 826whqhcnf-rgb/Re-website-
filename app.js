@@ -574,7 +574,21 @@ function detectInEssay(essay, question){
   const text = essay.trim();
   const lower = text.toLowerCase();
   const wordCount = (text.match(/\S+/g) || []).length;
-  const paragraphs = text.split(/\n\s*\n/).filter(function(p){ return p.trim().length > 30; });
+  /* Paragraph detection — try double-newline first, fall back to single-newline,
+     then to sentence-based clustering for essays pasted as one block. */
+  let paragraphs = text.split(/\n\s*\n/).filter(function(p){ return p.trim().length > 30; });
+  if (paragraphs.length <= 1){
+    paragraphs = text.split(/\n+/).filter(function(p){ return p.trim().length > 30; });
+  }
+  if (paragraphs.length <= 1){
+    /* No newlines at all — try splitting on sentence-pattern that looks like a paragraph break:
+       a full stop followed by 2+ spaces and a capital, or after certain transitional words */
+    const sentenceBlocks = text.split(/(?<=[.!?])\s+(?=(?:However|Despite|On the other hand|Conversely|Furthermore|Moreover|In contrast|Thus|Therefore|In conclusion|Finally|Firstly|Secondly|Anselm|Kant|Hume|Critics|First|Second|Although|Whilst|While))/);
+    if (sentenceBlocks.length > 1){
+      paragraphs = sentenceBlocks.filter(function(p){ return p.trim().length > 60; });
+    }
+  }
+  if (!paragraphs.length) paragraphs = [text];
   const paraCount = paragraphs.length;
 
   /* Distinct scholars */
@@ -587,7 +601,7 @@ function detectInEssay(essay, question){
   });
 
   /* Argumentative deployment: scholar within 80 chars of an argumentative verb */
-  const argVerbs = ['argues','argued','arguing','claims','claimed','claim','states','stated','writes','wrote','responds','responded','objects','objected','replies','replied','reply','maintains','maintained','holds','held','defends','defended','contends','contended','criticises','criticised','criticizes','criticized','rejects','rejected','asserts','asserted','denies','denied','answers','answered','observes','observed','suggests','suggested','proposes','proposed','believes','believed','thinks','thought','disagrees','agrees','distinguishes','accepts','accepted','attacks','attacked'];
+  const argVerbs = ['argues','argued','arguing','claims','claimed','claim','states','stated','writes','wrote','responds','responded','objects','objected','replies','replied','reply','maintains','maintained','holds','held','defends','defended','contends','contended','criticises','criticised','criticizes','criticized','rejects','rejected','asserts','asserted','denies','denied','answers','answered','observes','observed','suggests','suggested','proposes','proposed','believes','believed','thinks','thought','disagrees','agrees','distinguishes','accepts','accepted','attacks','attacked','concludes','concluded','attempts','attempting','tries','tried','points out','illustrates','illustrated','supports','supported','reasons','reasoned','disproves','disproved','succeeds','succeeded','shows','showed','demonstrates','demonstrated','refutes','refuted','establishes','established','develops','developed','proves','proved','views','viewed'];
   const verbsRe = argVerbs.join('|');
   const scholarsArgumentative = [];
   scholars.forEach(function(name){
@@ -747,27 +761,64 @@ function detectInEssay(essay, question){
    - question focus throughout (not just topic-word coverage)
    Returns suggested level 1-6.
 */
+/* AO1 holistic scoring. Each component contributes 0-3 points based on examiner-style
+   judgement, then we map total to level using best-fit. Different essays can demonstrate
+   excellence in different ways — this avoids brittleness of all-or-nothing thresholds. */
 function suggestAO1(d){
   if (d.wordCount === 0) return 1;
-  const argScholars = d.scholarsArgumentative.length;
+  /* Component A: scholar deployment (0-3) */
+  let scholarScore = 0;
+  const argSch = d.scholarsArgumentative.length;
+  if (argSch >= 5) scholarScore = 3;
+  else if (argSch >= 3) scholarScore = 2;
+  else if (argSch >= 2) scholarScore = 1;
+  /* Bonus if some named-but-not-argumentative scholars also recognized */
+  if (d.scholars.length >= 4 && scholarScore < 3) scholarScore += 0.5;
+  /* Component B: technical vocabulary in context (0-3) */
+  let techScore = 0;
   const tech = d.technicalTerms.length;
-  const words = d.wordCount;
+  if (tech >= 7) techScore = 3;
+  else if (tech >= 4) techScore = 2;
+  else if (tech >= 2) techScore = 1;
+  /* Component C: substance / length proxy for "detailed knowledge" (0-3) */
+  let lenScore = 0;
+  if (d.wordCount >= 700) lenScore = 3;
+  else if (d.wordCount >= 500) lenScore = 2.5;
+  else if (d.wordCount >= 350) lenScore = 1.5;
+  else if (d.wordCount >= 200) lenScore = 1;
+  /* Component D: question focus (0-3) */
   const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
   const tsf = d.topicSentenceFocus;
   const focus = qc * 0.3 + tsf * 0.7;
-  /* New requirement: L5+ needs no critical content missing if topic identified */
-  const requiredMissing = (d.missingRequiredScholars || []).length + (d.missingRequiredConcepts || []).length;
-  /* L6: examiners say "extensive scholarly range" + "thorough, precise" technical use.
-     Tighter than before: 6+ argumentative scholars, 7+ technical terms, 650+ words,
-     all required content present, 55%+ TSF. Quote-stuffing or scholar-listing demotes. */
-  if (argScholars >= 6 && tech >= 7 && words >= 650 && tsf >= 0.55 && focus >= 0.6 &&
-      requiredMissing === 0 && d.quoteStuffRatio < 0.2 && d.scholarListingSentences <= 1) return 6;
-  /* L5: requires solid deployment + most required content + decent focus */
-  if (argScholars >= 4 && tech >= 5 && words >= 500 && tsf >= 0.4 && focus >= 0.5 &&
-      requiredMissing <= 2 && d.quoteStuffRatio < 0.25) return 5;
-  if (argScholars >= 3 && tech >= 3 && words >= 400 && focus >= 0.32) return 4;
-  if (argScholars >= 2 && tech >= 2 && words >= 280 && focus >= 0.2) return 3;
-  if ((argScholars >= 1 || tech >= 1) && words >= 150) return 2;
+  let focusScore = 0;
+  if (focus >= 0.55) focusScore = 3;
+  else if (focus >= 0.4) focusScore = 2;
+  else if (focus >= 0.25) focusScore = 1.5;
+  else if (focus >= 0.1) focusScore = 1;
+  /* Component E: topic-required content (0-3 if topic identified, else 2 default) */
+  let contentScore = 2;
+  if (d.identifiedTopic){
+    const missingS = (d.missingRequiredScholars || []).length;
+    const missingC = (d.missingRequiredConcepts || []).length;
+    const totalMissing = missingS + missingC;
+    if (totalMissing === 0) contentScore = 3;
+    else if (totalMissing === 1) contentScore = 2.5;
+    else if (totalMissing === 2) contentScore = 2;
+    else if (totalMissing === 3) contentScore = 1.5;
+    else if (totalMissing === 4) contentScore = 1;
+    else contentScore = 0.5;
+  }
+  let total = scholarScore + techScore + lenScore + focusScore + contentScore;
+  /* Penalties for major weakness patterns (subtract a bit, never a hard cap) */
+  if (d.quoteStuffRatio > 0.3) total -= 1;
+  if (d.scholarListingSentences >= 3) total -= 0.5;
+  if (d.wordCount < 200) total -= 1;
+  /* Map total (max 15) to level. Best-fit. */
+  if (total >= 13) return 6;
+  if (total >= 11) return 5;
+  if (total >= 8.5) return 4;
+  if (total >= 6) return 3;
+  if (total >= 3.5) return 2;
   return 1;
 }
 
@@ -778,42 +829,65 @@ function suggestAO1(d){
    - clear thesis in intro, decisive conclusion that ties back
    - question focus throughout
 */
+/* AO2 holistic scoring. Five-ish components, each 0-3, mapped to level by best-fit. */
 function suggestAO2(d){
   if (d.wordCount === 0) return 1;
-  const fullStruct = d.paragraphsWithFullStructure;
+  /* Component A: argument structure (intro + body + conclusion) (0-3) */
+  let structureScore = 0;
+  if (d.hasIntro) structureScore += 1;
+  if (d.hasConclusion) structureScore += 1;
+  if (d.conclusionTiesBack) structureScore += 1;
+  /* Component B: dialectical engagement (0-3) */
+  let dialScore = 0;
   const dial = d.dialecticalPairs;
-  const sustained = d.sustainedReasoning;
+  const counterTotal = d.counterMoves.length;
+  if (dial >= 3) dialScore = 3;
+  else if (dial >= 2) dialScore = 2.5;
+  else if (dial >= 1) dialScore = 1.5;
+  else if (counterTotal >= 3) dialScore = 1;
+  else if (counterTotal >= 1) dialScore = 0.5;
+  /* Component C: justified evaluation + comparative reasoning (0-3) */
+  let evalScore = 0;
+  const justEval = d.justifiedEvaluation || 0;
+  const comparative = d.comparativeReasoning || 0;
   const embedded = d.embeddedEvaluation;
-  const words = d.wordCount;
+  const evalCombo = justEval + comparative;
+  if (evalCombo >= 5 && embedded >= 0.6) evalScore = 3;
+  else if (evalCombo >= 3 && embedded >= 0.4) evalScore = 2.5;
+  else if (evalCombo >= 2 || embedded >= 0.5) evalScore = 2;
+  else if (evalCombo >= 1 || embedded >= 0.3) evalScore = 1.5;
+  else if (embedded >= 0.15) evalScore = 1;
+  /* Component D: sophistication / A-star moves (0-3) */
+  let astarScore = 0;
+  const astar = (d.astarSignatures || []).length;
+  if (astar >= 6) astarScore = 3;
+  else if (astar >= 4) astarScore = 2.5;
+  else if (astar >= 3) astarScore = 2;
+  else if (astar >= 2) astarScore = 1.5;
+  else if (astar >= 1) astarScore = 1;
+  /* Component E: question focus / coherent line of reasoning (0-3) */
   const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
   const tsf = d.topicSentenceFocus;
   const focus = qc * 0.3 + tsf * 0.7;
-  const hasIntro = d.hasIntro;
-  const hasConc = d.hasConclusion;
-  const ties = d.conclusionTiesBack;
-  const justEval = d.justifiedEvaluation || 0;
-  const comparative = d.comparativeReasoning || 0;
-  const astar = (d.astarSignatures || []).length;
-  /* L6: examiners require "excellent line of reasoning, well-developed and sustained" PLUS
-     "confident and insightful critical analysis" PLUS "skilfully and clearly stated, coherently
-     developed and justified" PLUS "answers the question precisely throughout". So we need:
-     - dialectical pairs AND comparative reasoning (not juxtaposition)
-     - justified evaluation (counter + because)
-     - A-star signature moves (concession-pivot, ranking, cumulative verdict, reframing)
-     - sustained thesis recurrence
-     - tied-back conclusion */
-  if (fullStruct >= 3 && dial >= 2 && comparative >= 2 && justEval >= 3 && astar >= 2 &&
-      sustained >= 5 && hasIntro && ties && embedded >= 0.7 && focus >= 0.55 && tsf >= 0.5 &&
-      words >= 650 && !d.questionVerbatim) return 6;
-  /* L5: well-developed sustained reasoning, real dialectic, some comparative work */
-  if (fullStruct >= 2 && dial >= 2 && (comparative >= 1 || astar >= 1) && justEval >= 2 &&
-      sustained >= 3 && hasIntro && hasConc && embedded >= 0.55 && focus >= 0.45 && words >= 500) return 5;
-  /* L4: general success, evaluative attempts but maybe missing comparative force */
-  if (fullStruct >= 1 && dial >= 1 && justEval >= 1 && hasConc && embedded >= 0.4 && focus >= 0.35 && words >= 380) return 4;
-  /* L3: partially successful, some structure */
-  if (dial >= 1 && embedded >= 0.25 && words >= 260) return 3;
-  /* L2: some argument attempted */
-  if (embedded >= 0.1 && words >= 150) return 2;
+  const sustained = d.sustainedReasoning;
+  let coherenceScore = 0;
+  if (focus >= 0.55 && sustained >= 5) coherenceScore = 3;
+  else if (focus >= 0.45 && sustained >= 3) coherenceScore = 2.5;
+  else if (focus >= 0.35 && sustained >= 2) coherenceScore = 2;
+  else if (focus >= 0.25) coherenceScore = 1.5;
+  else if (focus >= 0.15) coherenceScore = 1;
+  /* Sum, with mild compensation between components (max 15) */
+  let total = structureScore + dialScore + evalScore + astarScore + coherenceScore;
+  /* Penalties */
+  if (d.wordCount < 200) total -= 2;
+  if (d.questionVerbatim) total -= 0.5;
+  if (d.quoteStuffRatio > 0.3) total -= 1;
+  /* Map to level */
+  if (total >= 13) return 6;
+  if (total >= 10.5) return 5;
+  if (total >= 8) return 4;
+  if (total >= 5.5) return 3;
+  if (total >= 3) return 2;
   return 1;
 }
 
@@ -836,6 +910,9 @@ function computeMarks(d){
   const autoAO2 = suggestAO2(d);
   const ao1L = MARKER_STATE.ao1Level != null ? MARKER_STATE.ao1Level : autoAO1;
   const ao2L = MARKER_STATE.ao2Level != null ? MARKER_STATE.ao2Level : autoAO2;
+  /* Default within-level position is 2 (slight inconsistency, upper-middle of band) for
+     suggested levels. Real examiners default to mid-band unless evidence pushes higher
+     or lower; this is closer to that. */
   const ao1P = MARKER_STATE.ao1Pos != null ? MARKER_STATE.ao1Pos : 2;
   const ao2P = MARKER_STATE.ao2Pos != null ? MARKER_STATE.ao2Pos : 2;
   const ao1Mark = markInLevel(ao1L, ao1P, AO1_LEVELS);
@@ -963,7 +1040,7 @@ function drawRubric(d, m){
   let html = '<div class="rubric-grade"><div class="rubric-grade-num ' + gradeClass + '">' + m.total + '<small>/40</small></div>' +
     '<div class="rubric-grade-band">Grade ' + grade + '</div>' +
     '<div class="rubric-grade-score">AO1 L' + m.ao1L + ' (' + m.ao1Mark + '/16) &middot; AO2 L' + m.ao2L + ' (' + m.ao2Mark + '/24)</div></div>' +
-    '<div class="lor-explainer">Levels are auto-suggested by checking specific criteria for each level (scholar deployment, technical vocabulary, paragraph structure, dialectical engagement, sustained reasoning, question focus). The marker is a heuristic, not a substitute for a teacher reading the essay — but it surfaces concrete weaknesses. Click any level to override.</div>' +
+    '<div class="lor-explainer">Holistic scoring across five weighted components: scholar deployment, technical knowledge, evaluation depth, A&#9733; argument moves, and sustained focus. Different essays can excel through different combinations &mdash; closer to how examiners actually judge. Click any level to override based on your own read of the descriptors. This is a heuristic; it cannot verify that scholar positions are stated correctly &mdash; that judgement requires a human reader.</div>' +
     aoBlock('ao1', 'Knowledge &amp; Understanding', m.ao1Mark, m.ao1L, m.ao1P, 16, AO1_LEVELS, m.autoAO1) +
     aoBlock('ao2', 'Analysis &amp; Evaluation', m.ao2Mark, m.ao2L, m.ao2P, 24, AO2_LEVELS, m.autoAO2);
   if (d.scholarsArgumentative.length){

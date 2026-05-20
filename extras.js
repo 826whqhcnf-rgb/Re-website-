@@ -420,25 +420,57 @@ const ASTAR_SIGNATURE = [
   'most defensible','the verdict is','on balance','ultimately',
   'misses that','misses the point','misses what',
   'sharp version','the strongest','the weakest',
-  'either or','dilemma','horns of'
+  'either or','dilemma','horns of',
+  /* Broader academic A-star patterns */
+  'succeeds in showing','succeeds in','fails to show','fails to justify','fails to establish',
+  'cannot establish','cannot sustain','cannot defend','loses its','loses force','loses persuasive',
+  'with greater success','greater success than','effective in','effectively shows',
+  'persuasive force','convincing force','rebuttal','strong rebuttal','weak rebuttal',
+  'straw man','category error','category mistake','begs the question',
+  'prima facie','on closer','closer inspection','at face value','at first glance',
+  'serious threat','serious challenge','serious objection','minor objection',
+  'remains successful','remains coherent','remains intact','still stands','still holds',
+  'in light of','in light of this','given that','given this',
+  'attempts to','attempts to show','attempts to disprove','attempts to defend',
+  'strong defence','weak defence','strong critique','weak critique',
+  'true that','indeed','crucially','significantly',
+  'better understood','best understood','more accurately',
+  'this is because','this is precisely','this is exactly',
+  'logically coherent','logically follows','logically incoherent',
+  'a priori','a posteriori','necessary truth','contingent truth',
+  'incoherence','incoherent','coherence','coherent',
+  'rationally','rationally justified','rational',
+  'objectively','objectively true','objectively false',
+  'demonstrably','demonstrably false','demonstrably true',
+  'refutation','effective refutation','refutes',
+  'definitive','definitively','decisively','decisive'
 ];
 
 /* Comparative reasoning — specifically argumentative comparison (not just juxtaposition) */
 const COMPARATIVE_PATTERNS = [
-  /more\s+(convincing|compelling|defensible|coherent|plausible|persuasive)\s+(than|because)/i,
-  /less\s+(convincing|compelling|defensible|coherent|plausible)\s+than/i,
-  /stronger\s+than\s+\w+\s+(because|since)/i,
-  /better\s+than\s+\w+\s+(because|since)/i,
-  /preferable\s+to/i,
-  /\bwhilst\b[^.]+\b(succeeds|works|holds)\b/i,
-  /\bwhereas\b[^.]+\b(succeeds|works|fails)\b/i,
-  /goes\s+further\s+than/i,
-  /captures\s+what\s+\w+\s+(misses|cannot)/i,
-  /while\s+\w+\s+(is right|succeeds)[^.]+\w+\s+(fails|misses)/i
+  /more\s+(convincing|compelling|defensible|coherent|plausible|persuasive|effective|successful|complete)\b/i,
+  /less\s+(convincing|compelling|defensible|coherent|plausible|effective)\b/i,
+  /stronger\s+than\b/i,
+  /weaker\s+than\b/i,
+  /better\s+than\b/i,
+  /preferable\s+to\b/i,
+  /greater\s+success\s+than\b/i,
+  /with\s+greater\s+(success|force|effectiveness|persuasiveness)\b/i,
+  /\bwhilst\b[^.!?]+\b(succeeds|works|holds|fails|stands)\b/i,
+  /\bwhereas\b[^.!?]+\b(succeeds|works|fails|holds|stands)\b/i,
+  /\bwhile\b[^.!?]+\b(fails|succeeds|holds)\b/i,
+  /goes\s+further\s+than\b/i,
+  /captures\s+what\s+\w+\s+(misses|cannot|fails)/i,
+  /unlike\s+\w+,?\s+\w+\s+(succeeds|fails|holds|works)/i,
+  /(succeeds|fails)\s+where\s+\w+\s+(does\s+not|cannot|fails)/i,
+  /(is|are)\s+(the\s+)?(strongest|weakest|most\s+\w+)/i,
+  /the\s+(strongest|weakest|most\s+convincing|sharpest|decisive)/i,
+  /\b(succeeds|fails)\s+in\b/i,
+  /\b(refutes|defeats|undermines|overturns)\b/i
 ];
 
 /* Justified evaluation = evaluative move FOLLOWED by reasoning within ~100 chars */
-const EVAL_THEN_REASON = /\b(however|although|whereas|nevertheless|but|in contrast|critics|objection|fails|succeeds|is mistaken|is correct|convincing|unconvincing|preferable|stronger|weaker)\b[^.!?]{0,120}\b(because|since|for the reason|on the grounds|in light of|given that|inasmuch as)\b/gi;
+const EVAL_THEN_REASON = /\b(however|although|whereas|nevertheless|but|in contrast|critics|objection|fails|succeeds|is mistaken|is correct|convincing|unconvincing|preferable|stronger|weaker|succeeds|effective|persuasive|coherent|incoherent|loses|gains|works|holds)\b[^.!?]{0,150}\b(because|since|for the reason|on the grounds|in light of|given that|inasmuch as|as the|as it|as he|as she|as they|as this|as a|as an|since the|since it|so that|so as|insofar as|due to|owing to|in that)\b/gi;
 
 /* Topic identification keywords — used to flag missing required content */
 const TOPIC_KEYWORDS = {
