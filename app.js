@@ -676,6 +676,52 @@ function detectInEssay(essay, question){
     }).length;
   }
 
+  /* Specific textual references — citations examiners reward.
+     Proslogion N, Summa I.X, Genesis N, John N:N, Romans N, Article X, etc. */
+  const textRefPatterns = [
+    /\bProslogion\s+(?:\d+|chapter\s+\d+|ch\.?\s*\d+|[IV]+)/gi,
+    /\bSumma\s+(?:Theologiae|Contra|[IV]+\.?\d*)/gi,
+    /\b(?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|Samuel|Kings|Chronicles|Job|Psalm[s]?|Proverbs|Isaiah|Jeremiah|Ezekiel|Daniel|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|Hebrews|James|Peter|Jude|Revelation)\s+\d+(?::\d+)?/gi,
+    /\bGroundwork(?:\s+(?:of|for))?(?:\s+(?:the|of))?\s*(?:Metaphysics)?/gi,
+    /\bCritique\s+of\s+(?:Pure|Practical)\s+Reason/gi,
+    /\bConfessions\s+(?:Book\s+)?[IVX]+/gi,
+    /\bDe\s+Anima\s+[IVX]+/gi,
+    /\bNicomachean\s+Ethics(?:\s+Book\s+[IVX]+)?/gi,
+    /\bCity\s+of\s+God(?:\s+Book\s+[IVX]+)?/gi,
+    /\bDialogues(?:\s+Concerning\s+Natural\s+Religion)?(?:\s+Part\s+[IVX]+)?/gi,
+    /\bLanguage,?\s+Truth\s+and\s+Logic/gi,
+    /\bPhilosophical\s+Investigations/gi,
+    /\bMere\s+Christianity/gi,
+    /\bThe\s+God\s+Delusion/gi,
+    /\bDynamics\s+of\s+Faith/gi,
+    /\b(?:Article|Question|Part|Book|Chapter|Ch\.?)\s+[IVX0-9]+/gi,
+    /\b\d{4}\)/g  /* "(1781)" style year-citation */
+  ];
+  const textRefs = [];
+  textRefPatterns.forEach(function(re){
+    const matches = text.match(re) || [];
+    matches.forEach(function(m){ if (textRefs.indexOf(m) < 0) textRefs.push(m); });
+  });
+
+  /* Sentence-level evaluation quality — count sentences containing both an evaluative marker
+     AND reasoning. Heavier signal than paragraph-presence. */
+  const allSentencesArr = text.split(/(?<=[.!?])\s+/);
+  let evalSentenceCount = 0;
+  let descrSentenceCount = 0;
+  const reasonWordsList = ['because','since','therefore','thus','hence','consequently','it follows','this means','this implies','this shows','as the','as it','as he','as she','as they','as a','given that','due to','owing to','insofar as','in that','so'];
+  allSentencesArr.forEach(function(s){
+    const sl = s.toLowerCase().trim();
+    if (sl.length < 15) return;
+    const hasEval = EVALUATION_MARKERS.some(function(m){ return sl.indexOf(m) >= 0; });
+    const hasReason = reasonWordsList.some(function(m){ return sl.indexOf(' ' + m + ' ') >= 0 || sl.indexOf(m + ' ') === 0; });
+    const hasScholar = scholars.some(function(n){ return s.indexOf(n) >= 0; });
+    if (hasEval && hasReason) evalSentenceCount++;
+    else if (hasScholar && !hasEval && !hasReason) descrSentenceCount++;
+  });
+  /* Ratio: evaluation sentences vs purely descriptive scholar-mention sentences.
+     A good essay has at least 1 evaluative sentence per 2 descriptive. */
+  const evalToDescrRatio = descrSentenceCount > 0 ? evalSentenceCount / descrSentenceCount : (evalSentenceCount > 0 ? 2 : 0);
+
   /* Justified evaluation — evaluative move FOLLOWED by reasoning within 120 chars */
   const justifiedEvalMatches = text.match(EVAL_THEN_REASON) || [];
   const justifiedEvaluation = justifiedEvalMatches.length;
@@ -750,7 +796,11 @@ function detectInEssay(essay, question){
     questionVerbatim: questionVerbatim,
     identifiedTopic: identifiedTopic,
     missingRequiredScholars: missingRequiredScholars,
-    missingRequiredConcepts: missingRequiredConcepts
+    missingRequiredConcepts: missingRequiredConcepts,
+    textRefs: textRefs,
+    evalSentenceCount: evalSentenceCount,
+    descrSentenceCount: descrSentenceCount,
+    evalToDescrRatio: evalToDescrRatio
   };
 }
 
@@ -774,12 +824,17 @@ function suggestAO1(d){
   else if (argSch >= 2) scholarScore = 1;
   /* Bonus if some named-but-not-argumentative scholars also recognized */
   if (d.scholars.length >= 4 && scholarScore < 3) scholarScore += 0.5;
-  /* Component B: technical vocabulary in context (0-3) */
+  /* Component B: technical vocabulary + textual citations (0-3) */
   let techScore = 0;
   const tech = d.technicalTerms.length;
-  if (tech >= 7) techScore = 3;
-  else if (tech >= 4) techScore = 2;
-  else if (tech >= 2) techScore = 1;
+  const refs = (d.textRefs || []).length;
+  /* Combine tech-term count with text-reference count — refs are stronger signal */
+  const techCombined = tech + refs * 1.5;
+  if (techCombined >= 8) techScore = 3;
+  else if (techCombined >= 5) techScore = 2.5;
+  else if (techCombined >= 3) techScore = 2;
+  else if (techCombined >= 2) techScore = 1;
+  else if (techCombined >= 1) techScore = 0.5;
   /* Component C: substance / length proxy for "detailed knowledge" (0-3) */
   let lenScore = 0;
   if (d.wordCount >= 700) lenScore = 3;
@@ -809,17 +864,23 @@ function suggestAO1(d){
     else contentScore = 0.5;
   }
   let total = scholarScore + techScore + lenScore + focusScore + contentScore;
-  /* Penalties for major weakness patterns (subtract a bit, never a hard cap) */
-  if (d.quoteStuffRatio > 0.3) total -= 1;
-  if (d.scholarListingSentences >= 3) total -= 0.5;
-  if (d.wordCount < 200) total -= 1;
-  /* Map total (max 15) to level. Best-fit. */
-  if (total >= 13) return 6;
-  if (total >= 11) return 5;
-  if (total >= 8.5) return 4;
-  if (total >= 6) return 3;
-  if (total >= 3.5) return 2;
-  return 1;
+  const components = {
+    scholar: scholarScore, tech: techScore, length: lenScore,
+    focus: focusScore, content: contentScore
+  };
+  /* Penalties */
+  let penalties = 0;
+  if (d.quoteStuffRatio > 0.3){ total -= 1; penalties -= 1; }
+  if (d.scholarListingSentences >= 3){ total -= 0.5; penalties -= 0.5; }
+  if (d.wordCount < 200){ total -= 1; penalties -= 1; }
+  let level;
+  if (total >= 13) level = 6;
+  else if (total >= 11) level = 5;
+  else if (total >= 8.5) level = 4;
+  else if (total >= 6) level = 3;
+  else if (total >= 3.5) level = 2;
+  else level = 1;
+  return { level: level, total: total, components: components, penalties: penalties };
 }
 
 /* AO2 = Analysis & Evaluation. Criterion-based: each level requires:
@@ -846,17 +907,25 @@ function suggestAO2(d){
   else if (dial >= 1) dialScore = 1.5;
   else if (counterTotal >= 3) dialScore = 1;
   else if (counterTotal >= 1) dialScore = 0.5;
-  /* Component C: justified evaluation + comparative reasoning (0-3) */
+  /* Component C: evaluation depth (0-3). Combines:
+     - justified evaluation (counter + because)
+     - comparative reasoning
+     - sentence-level evaluative density (eval-sentences vs purely-descriptive)
+     - paragraph-level embedded evaluation */
   let evalScore = 0;
   const justEval = d.justifiedEvaluation || 0;
   const comparative = d.comparativeReasoning || 0;
   const embedded = d.embeddedEvaluation;
+  const evalSentences = d.evalSentenceCount || 0;
+  const evalRatio = d.evalToDescrRatio || 0;
   const evalCombo = justEval + comparative;
-  if (evalCombo >= 5 && embedded >= 0.6) evalScore = 3;
-  else if (evalCombo >= 3 && embedded >= 0.4) evalScore = 2.5;
-  else if (evalCombo >= 2 || embedded >= 0.5) evalScore = 2;
-  else if (evalCombo >= 1 || embedded >= 0.3) evalScore = 1.5;
-  else if (embedded >= 0.15) evalScore = 1;
+  if (evalCombo >= 5 && embedded >= 0.5 && evalSentences >= 6) evalScore = 3;
+  else if (evalCombo >= 4 && embedded >= 0.4 && evalSentences >= 4) evalScore = 2.5;
+  else if (evalCombo >= 2 && (embedded >= 0.4 || evalSentences >= 3)) evalScore = 2;
+  else if (evalCombo >= 1 || embedded >= 0.3 || evalSentences >= 2) evalScore = 1.5;
+  else if (embedded >= 0.15 || evalSentences >= 1) evalScore = 1;
+  /* If purely descriptive (lots of scholar-mention sentences, very few eval) — cap */
+  if (evalRatio > 0 && evalRatio < 0.3 && d.descrSentenceCount >= 5) evalScore = Math.min(evalScore, 1.5);
   /* Component D: sophistication / A-star moves (0-3) */
   let astarScore = 0;
   const astar = (d.astarSignatures || []).length;
@@ -876,19 +945,23 @@ function suggestAO2(d){
   else if (focus >= 0.35 && sustained >= 2) coherenceScore = 2;
   else if (focus >= 0.25) coherenceScore = 1.5;
   else if (focus >= 0.15) coherenceScore = 1;
-  /* Sum, with mild compensation between components (max 15) */
   let total = structureScore + dialScore + evalScore + astarScore + coherenceScore;
-  /* Penalties */
-  if (d.wordCount < 200) total -= 2;
-  if (d.questionVerbatim) total -= 0.5;
-  if (d.quoteStuffRatio > 0.3) total -= 1;
-  /* Map to level */
-  if (total >= 13) return 6;
-  if (total >= 10.5) return 5;
-  if (total >= 8) return 4;
-  if (total >= 5.5) return 3;
-  if (total >= 3) return 2;
-  return 1;
+  const components = {
+    structure: structureScore, dialectic: dialScore,
+    evaluation: evalScore, astar: astarScore, coherence: coherenceScore
+  };
+  let penalties = 0;
+  if (d.wordCount < 200){ total -= 2; penalties -= 2; }
+  if (d.questionVerbatim){ total -= 0.5; penalties -= 0.5; }
+  if (d.quoteStuffRatio > 0.3){ total -= 1; penalties -= 1; }
+  let level;
+  if (total >= 13) level = 6;
+  else if (total >= 10.5) level = 5;
+  else if (total >= 8) level = 4;
+  else if (total >= 5.5) level = 3;
+  else if (total >= 3) level = 2;
+  else level = 1;
+  return { level: level, total: total, components: components, penalties: penalties };
 }
 
 function markInLevel(level, pos, levels){
@@ -906,18 +979,23 @@ function markInLevel(level, pos, levels){
 }
 
 function computeMarks(d){
-  const autoAO1 = suggestAO1(d);
-  const autoAO2 = suggestAO2(d);
+  const ao1Result = suggestAO1(d);
+  const ao2Result = suggestAO2(d);
+  const autoAO1 = ao1Result.level;
+  const autoAO2 = ao2Result.level;
   const ao1L = MARKER_STATE.ao1Level != null ? MARKER_STATE.ao1Level : autoAO1;
   const ao2L = MARKER_STATE.ao2Level != null ? MARKER_STATE.ao2Level : autoAO2;
-  /* Default within-level position is 2 (slight inconsistency, upper-middle of band) for
-     suggested levels. Real examiners default to mid-band unless evidence pushes higher
-     or lower; this is closer to that. */
   const ao1P = MARKER_STATE.ao1Pos != null ? MARKER_STATE.ao1Pos : 2;
   const ao2P = MARKER_STATE.ao2Pos != null ? MARKER_STATE.ao2Pos : 2;
   const ao1Mark = markInLevel(ao1L, ao1P, AO1_LEVELS);
   const ao2Mark = markInLevel(ao2L, ao2P, AO2_LEVELS);
-  return { ao1L: ao1L, ao2L: ao2L, ao1P: ao1P, ao2P: ao2P, ao1Mark: ao1Mark, ao2Mark: ao2Mark, total: ao1Mark + ao2Mark, autoAO1: autoAO1, autoAO2: autoAO2 };
+  return {
+    ao1L: ao1L, ao2L: ao2L, ao1P: ao1P, ao2P: ao2P,
+    ao1Mark: ao1Mark, ao2Mark: ao2Mark,
+    total: ao1Mark + ao2Mark,
+    autoAO1: autoAO1, autoAO2: autoAO2,
+    ao1Result: ao1Result, ao2Result: ao2Result
+  };
 }
 
 function getGrade(mark){
@@ -928,6 +1006,34 @@ function getGrade(mark){
   if (mark >= 13) return 'D';
   if (mark >= 8) return 'E';
   return 'U';
+}
+
+function renderSavedAttempts(){
+  let attempts = [];
+  try { attempts = JSON.parse(localStorage.getItem('h573_marks_v1') || '[]'); } catch(e){}
+  if (!attempts.length) return '';
+  let html = '<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px dashed var(--rule)"><div style="font-family:var(--ui);font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ochre);font-weight:600;margin-bottom:0.4rem">Saved marks (' + attempts.length + ')</div>';
+  attempts.slice(0, 8).forEach(function(att, i){
+    const d = new Date(att.time);
+    const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+    const gradeColour = att.grade === 'A*' ? 'var(--gold)' : att.grade === 'A' ? 'var(--claret)' : att.grade === 'B' ? 'var(--ochre)' : 'var(--muted)';
+    html += '<div style="display:grid;grid-template-columns:auto 1fr auto;gap:0.5rem;align-items:center;padding:0.35rem 0.5rem;background:var(--wash);border:1px solid var(--rule);margin-bottom:0.3rem;cursor:pointer" class="mk-attempt-load" data-idx="' + i + '">' +
+      '<div style="font-family:var(--display);font-style:italic;font-weight:700;font-size:1rem;color:' + gradeColour + ';width:1.6rem;text-align:center">' + att.total + '</div>' +
+      '<div style="font-family:var(--display);font-style:italic;font-size:0.82rem;line-height:1.3;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (att.question || 'Untitled') + '<div style="font-family:var(--ui);font-style:normal;font-size:0.58rem;letter-spacing:0.06em;color:var(--muted);margin-top:0.1rem">' + dateStr + ' &middot; ' + att.wordCount + ' words &middot; ' + att.grade + '</div></div>' +
+      '<button class="mk-attempt-delete" data-idx="' + i + '" style="padding:0.15rem 0.4rem;font-family:var(--ui);font-size:0.6rem;background:transparent;border:1px solid var(--rule);color:var(--muted);border-radius:2px;cursor:pointer">×</button>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function componentBar(label, val, max){
+  const pct = Math.round((val / max) * 100);
+  const colour = val >= max * 0.8 ? 'var(--green)' : val >= max * 0.5 ? 'var(--ochre)' : 'var(--claret)';
+  return '<div style="margin:0.25rem 0">' +
+    '<div style="display:flex;justify-content:space-between;font-family:var(--ui);font-size:0.65rem;color:var(--muted);margin-bottom:0.1rem"><span>' + label + '</span><span style="color:var(--ink);font-weight:600">' + val.toFixed(1) + '/' + max + '</span></div>' +
+    '<div style="height:5px;background:var(--paper-deep);border-radius:2px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + colour + ';transition:width 0.3s"></div></div>' +
+    '</div>';
 }
 
 function diag(label, ok){
@@ -1062,6 +1168,24 @@ function drawRubric(d, m){
     d.technicalTerms.slice(0, 14).forEach(function(t){ html += '<span class="detected-tag tech">' + t + '</span>'; });
     html += '</div></div>';
   }
+  /* Component scoring breakdown */
+  if (m.ao1Result && m.ao2Result){
+    html += '<div class="detected-list"><div class="detected-list-label">How the score was built</div>' +
+      '<div style="font-family:var(--ui);font-size:0.72rem;font-weight:600;color:var(--claret);margin:0.4rem 0 0.2rem">AO1 components (total ' + m.ao1Result.total.toFixed(1) + '/15 → L' + m.autoAO1 + ')</div>' +
+      componentBar('Scholar deployment', m.ao1Result.components.scholar, 3) +
+      componentBar('Technical &amp; textual references', m.ao1Result.components.tech, 3) +
+      componentBar('Substance (length proxy)', m.ao1Result.components.length, 3) +
+      componentBar('Question focus', m.ao1Result.components.focus, 3) +
+      componentBar('Topic-required content', m.ao1Result.components.content, 3) +
+      '<div style="font-family:var(--ui);font-size:0.72rem;font-weight:600;color:var(--ochre);margin:0.7rem 0 0.2rem">AO2 components (total ' + m.ao2Result.total.toFixed(1) + '/15 → L' + m.autoAO2 + ')</div>' +
+      componentBar('Argument structure (intro/conc/ties)', m.ao2Result.components.structure, 3) +
+      componentBar('Dialectical engagement', m.ao2Result.components.dialectic, 3) +
+      componentBar('Evaluation depth', m.ao2Result.components.evaluation, 3) +
+      componentBar('A&#9733; signature moves', m.ao2Result.components.astar, 3) +
+      componentBar('Coherent line of reasoning', m.ao2Result.components.coherence, 3) +
+      '</div>';
+  }
+
   /* Structure diagnostics */
   html += '<div class="detected-list"><div class="detected-list-label">Essay structure detected</div><div style="font-family:var(--body);font-size:0.78rem;line-height:1.7;color:var(--ink)">' +
     diag('Intro with thesis', d.hasIntro) +
@@ -1072,6 +1196,8 @@ function drawRubric(d, m){
     diagN('Justified evaluation (counter + reasoning)', d.justifiedEvaluation || 0, 3) +
     diagN('Comparative reasoning ("stronger than", "more convincing because")', d.comparativeReasoning || 0, 2) +
     diagN('A★ signature moves (concession-pivot, ranking, etc.)', (d.astarSignatures || []).length, 2) +
+    diagN('Specific textual references (Proslogion 2, Romans 5, etc.)', (d.textRefs || []).length, 2) +
+    diagN('Evaluative sentences (eval + reasoning together)', d.evalSentenceCount || 0, 5) +
     diagPct('Body paragraphs evaluating, not just describing', d.embeddedEvaluation, 0.7) +
     diagPct('Topic sentences that focus on the question', d.topicSentenceFocus, 0.55) +
     diagN('Sustained reasoning (thesis words recurring)', d.sustainedReasoning, 5) +
@@ -1116,6 +1242,11 @@ function drawRubric(d, m){
     }
     html += '</ul></div>';
   }
+  /* Save attempt button + history */
+  html += '<div style="margin-top:1rem;padding-top:0.8rem;border-top:1px dashed var(--rule-strong)">' +
+    '<button id="mk-save-attempt" style="width:100%;padding:0.5rem 0.85rem;font-family:var(--ui);font-size:0.72rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer">Save this mark to history</button>' +
+    renderSavedAttempts() +
+    '</div>';
   rubric.innerHTML = html;
   rubric.querySelectorAll('.lor-level').forEach(function(b){
     b.addEventListener('click', function(){
@@ -1124,6 +1255,48 @@ function drawRubric(d, m){
       if (ao === 'ao1'){ MARKER_STATE.ao1Level = L; MARKER_STATE.ao1Pos = null; }
       else { MARKER_STATE.ao2Level = L; MARKER_STATE.ao2Pos = null; }
       drawRubric(d, computeMarks(d));
+    });
+  });
+  /* Wire save */
+  const saveBtn = document.getElementById('mk-save-attempt');
+  if (saveBtn){
+    saveBtn.addEventListener('click', function(){
+      const question = document.getElementById('mk-q').value.trim();
+      const essay = document.getElementById('mk-essay').value.trim();
+      if (!essay || essay.length < 100){ toast('Essay too short to save'); return; }
+      const attempts = JSON.parse(localStorage.getItem('h573_marks_v1') || '[]');
+      attempts.unshift({
+        time: Date.now(),
+        question: question.slice(0, 120),
+        wordCount: d.wordCount,
+        ao1L: m.ao1L, ao1Mark: m.ao1Mark, ao2L: m.ao2L, ao2Mark: m.ao2Mark,
+        total: m.total, grade: getGrade(m.total),
+        identifiedTopic: d.identifiedTopic,
+        essay: essay.slice(0, 5000)
+      });
+      localStorage.setItem('h573_marks_v1', JSON.stringify(attempts.slice(0, 20)));
+      toast('Mark saved (' + m.total + '/40)', 'success');
+      drawRubric(d, m);
+    });
+  }
+  /* Wire history clicks */
+  document.querySelectorAll('.mk-attempt-load').forEach(function(b){
+    b.addEventListener('click', function(){
+      const attempts = JSON.parse(localStorage.getItem('h573_marks_v1') || '[]');
+      const att = attempts[parseInt(b.dataset.idx)];
+      if (!att) return;
+      document.getElementById('mk-q').value = att.question;
+      document.getElementById('mk-essay').value = att.essay;
+      document.getElementById('mk-essay').dispatchEvent(new Event('input'));
+    });
+  });
+  document.querySelectorAll('.mk-attempt-delete').forEach(function(b){
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      const attempts = JSON.parse(localStorage.getItem('h573_marks_v1') || '[]');
+      attempts.splice(parseInt(b.dataset.idx), 1);
+      localStorage.setItem('h573_marks_v1', JSON.stringify(attempts));
+      drawRubric(d, m);
     });
   });
   rubric.querySelectorAll('.lor-pos').forEach(function(b){
