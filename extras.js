@@ -403,3 +403,107 @@ const EVALUATION_MARKERS = ['however','although','whereas','whilst','nevertheles
   'this shows','this demonstrates','critics','objection','would argue','is correct','is mistaken',
   'is convincing','is unconvincing','fails because','succeeds because','stronger','weaker',
   'preferable','therefore','thus','hence','consequently'];
+
+/* A-star signature moves: specific phrasings that examiners flag as marks of sophisticated argument.
+   Concession-pivot, ranking objections, cumulative verdict, modus tollens chains, reframing. */
+const ASTAR_SIGNATURE = [
+  'sharpest objection','sharpest version','cuts both ways','cuts against','shared ground',
+  'proves too much','depends entirely on','depends on the premise','the real question is',
+  'real problem','deeper question','what this reveals','what this means is',
+  'taken together','on this point','precisely because','precisely the point',
+  'concede','concedes','grant the objection','grant that','granted that',
+  'self-defeating','question-begging','collapses into','reduces to',
+  'fails on its own terms','fails by its own','consistent with',
+  'goes through only if','only at the cost','only if we accept',
+  'survives','fails as','succeeds as','works only if',
+  'more convincing than','more compelling than','stronger than','weaker than',
+  'most defensible','the verdict is','on balance','ultimately',
+  'misses that','misses the point','misses what',
+  'sharp version','the strongest','the weakest',
+  'either or','dilemma','horns of'
+];
+
+/* Comparative reasoning — specifically argumentative comparison (not just juxtaposition) */
+const COMPARATIVE_PATTERNS = [
+  /more\s+(convincing|compelling|defensible|coherent|plausible|persuasive)\s+(than|because)/i,
+  /less\s+(convincing|compelling|defensible|coherent|plausible)\s+than/i,
+  /stronger\s+than\s+\w+\s+(because|since)/i,
+  /better\s+than\s+\w+\s+(because|since)/i,
+  /preferable\s+to/i,
+  /\bwhilst\b[^.]+\b(succeeds|works|holds)\b/i,
+  /\bwhereas\b[^.]+\b(succeeds|works|fails)\b/i,
+  /goes\s+further\s+than/i,
+  /captures\s+what\s+\w+\s+(misses|cannot)/i,
+  /while\s+\w+\s+(is right|succeeds)[^.]+\w+\s+(fails|misses)/i
+];
+
+/* Justified evaluation = evaluative move FOLLOWED by reasoning within ~100 chars */
+const EVAL_THEN_REASON = /\b(however|although|whereas|nevertheless|but|in contrast|critics|objection|fails|succeeds|is mistaken|is correct|convincing|unconvincing|preferable|stronger|weaker)\b[^.!?]{0,120}\b(because|since|for the reason|on the grounds|in light of|given that|inasmuch as)\b/gi;
+
+/* Topic identification keywords — used to flag missing required content */
+const TOPIC_KEYWORDS = {
+  "plato-aristotle":["plato","aristotle","forms","prime mover","four causes","cave","telos"],
+  "soul-mind-body":["soul","dualism","descartes","materialism","ryle","hylomorphism","mind","body"],
+  "observation":["cosmological","teleological","design","aquinas","paley","hume","fine-tuning","contingency"],
+  "reason":["ontological","anselm","gaunilo","kant","predicate","necessary"],
+  "religious-experience":["mystical","conversion","james","swinburne","credulity","numinous"],
+  "problem-of-evil":["evil","theodicy","augustine","hick","mackie","soul-making","plantinga","privatio"],
+  "attributes-god":["omnipotent","omniscient","omnibenevolent","eternity","boethius","swinburne","foreknowledge"],
+  "religious-language-1":["via negativa","analogy","aquinas","tillich","symbol","dionysius","maimonides"],
+  "religious-language-2":["verification","falsification","ayer","flew","mitchell","wittgenstein","language game"],
+  "natural-law":["natural law","aquinas","telos","precepts","double effect","finnis"],
+  "situation-ethics":["situation","fletcher","agape","love"],
+  "kant":["kant","categorical imperative","duty","maxim","humanity","universal"],
+  "utilitarianism":["bentham","mill","utility","hedonic","preference","singer","greatest happiness"],
+  "euthanasia":["euthanasia","sanctity","quality","voluntary","autonomy","rachels","singer"],
+  "business-ethics":["business","corporate","friedman","stakeholder","whistle","globalisation"],
+  "meta-ethics":["meta-ethics","naturalism","intuitionism","emotivism","moore","naturalistic fallacy","open question"],
+  "conscience":["conscience","aquinas","synderesis","freud","super-ego","fromm"],
+  "sexual-ethics":["sexual","homosexuality","marriage","premarital","extramarital","natural law"],
+  "augustine":["augustine","original sin","fall","grace","summum bonum","incurvatus"],
+  "death-afterlife":["heaven","hell","purgatory","election","universalism","sheep","goats","matthew 25"],
+  "knowledge-god":["natural theology","revealed","calvin","barth","sensus","plantinga"],
+  "jesus-christ":["jesus","christ","son of god","wisdom","liberator","resurrection"],
+  "moral-principles":["bible","sola scriptura","tradition","agape","authority","fletcher"],
+  "bonhoeffer":["bonhoeffer","costly grace","civil disobedience","finkenwalde","confessing church"],
+  "pluralism-theology":["exclusivism","inclusivism","pluralism","rahner","hick","anonymous christian"],
+  "pluralism-society":["dialogue","scriptural reasoning","mission","interfaith","newbigin"],
+  "gender-society":["gender","feminism","mulieris","de beauvoir","complementarity"],
+  "gender-theology":["ruether","daly","wisdom","sophia","feminist theology"],
+  "secularism":["secularism","freud","dawkins","wish-fulfilment","delusion","humanism"],
+  "liberation":["liberation","gutierrez","gutiérrez","boff","marx","alienation","preferential option"]
+};
+
+/* Topic required-content checklist: scholars and concepts an L5+ essay should mention */
+const TOPIC_REQUIREMENTS = {
+  "plato-aristotle":{scholars:["Plato","Aristotle"],concepts:["forms","prime mover","four causes"]},
+  "soul-mind-body":{scholars:["Plato","Aristotle","Descartes"],concepts:["dualism","soul"]},
+  "observation":{scholars:["Aquinas","Hume"],concepts:["cosmological","teleological"]},
+  "reason":{scholars:["Anselm","Kant"],concepts:["ontological","necessary"]},
+  "religious-experience":{scholars:["James","Swinburne"],concepts:["mystical","credulity"]},
+  "problem-of-evil":{scholars:["Augustine","Hick","Mackie"],concepts:["theodicy","free will"]},
+  "attributes-god":{scholars:["Boethius","Swinburne"],concepts:["omniscience","eternity","foreknowledge"]},
+  "religious-language-1":{scholars:["Aquinas","Tillich"],concepts:["analogy","symbol"]},
+  "religious-language-2":{scholars:["Ayer","Flew","Wittgenstein"],concepts:["verification","falsification"]},
+  "natural-law":{scholars:["Aquinas"],concepts:["telos","precepts"]},
+  "situation-ethics":{scholars:["Fletcher"],concepts:["agape","love"]},
+  "kant":{scholars:["Kant"],concepts:["categorical imperative","duty","humanity"]},
+  "utilitarianism":{scholars:["Bentham","Mill"],concepts:["utility","happiness"]},
+  "euthanasia":{scholars:[],concepts:["sanctity","quality","autonomy"]},
+  "business-ethics":{scholars:["Friedman"],concepts:["shareholder","stakeholder"]},
+  "meta-ethics":{scholars:["Moore","Ayer"],concepts:["naturalistic fallacy","intuitionism","emotivism"]},
+  "conscience":{scholars:["Aquinas","Freud"],concepts:["synderesis","super-ego"]},
+  "sexual-ethics":{scholars:[],concepts:["natural law","consent","marriage"]},
+  "augustine":{scholars:["Augustine"],concepts:["original sin","grace","fall"]},
+  "death-afterlife":{scholars:[],concepts:["heaven","hell","election"]},
+  "knowledge-god":{scholars:["Calvin","Barth"],concepts:["natural theology","revelation"]},
+  "jesus-christ":{scholars:[],concepts:["son of god","wisdom","liberator"]},
+  "moral-principles":{scholars:[],concepts:["bible","tradition","reason"]},
+  "bonhoeffer":{scholars:["Bonhoeffer"],concepts:["costly grace","civil disobedience"]},
+  "pluralism-theology":{scholars:["Rahner","Hick"],concepts:["exclusivism","inclusivism","pluralism"]},
+  "pluralism-society":{scholars:[],concepts:["dialogue","mission"]},
+  "gender-society":{scholars:[],concepts:["complementarity","feminism"]},
+  "gender-theology":{scholars:["Ruether","Daly"],concepts:["feminist theology"]},
+  "secularism":{scholars:["Freud","Dawkins"],concepts:["wish-fulfilment","delusion"]},
+  "liberation":{scholars:["Gutiérrez","Marx"],concepts:["liberation","preferential option"]}
+};

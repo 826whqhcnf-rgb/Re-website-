@@ -662,6 +662,60 @@ function detectInEssay(essay, question){
     }).length;
   }
 
+  /* Justified evaluation — evaluative move FOLLOWED by reasoning within 120 chars */
+  const justifiedEvalMatches = text.match(EVAL_THEN_REASON) || [];
+  const justifiedEvaluation = justifiedEvalMatches.length;
+
+  /* Comparative reasoning — argumentative comparison, not juxtaposition */
+  let comparativeReasoning = 0;
+  COMPARATIVE_PATTERNS.forEach(function(re){
+    const m = text.match(new RegExp(re.source, re.flags + 'g'));
+    if (m) comparativeReasoning += m.length;
+  });
+
+  /* A-star signature moves */
+  const astarSignatures = ASTAR_SIGNATURE.filter(function(p){ return lower.indexOf(p) >= 0; });
+
+  /* Weak patterns examiners flag */
+  const quotedSegments = text.match(/['"][^'"]{30,}['"]/g) || [];
+  const quotedWords = quotedSegments.reduce(function(sum, s){ return sum + (s.match(/\S+/g) || []).length; }, 0);
+  const quoteStuffRatio = wordCount > 0 ? quotedWords / wordCount : 0;
+  let scholarListingSentences = 0;
+  const allSentences = text.split(/[.!?]+/);
+  allSentences.forEach(function(s){
+    let inSent = 0;
+    scholars.forEach(function(n){ if (s.indexOf(n) >= 0) inSent++; });
+    if (inSent >= 3) scholarListingSentences++;
+  });
+  let questionVerbatim = false;
+  if (question.length > 20){
+    const qNorm = question.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const qChunks = qNorm.split(' ');
+    for (let i = 0; i + 8 <= qChunks.length; i++){
+      const chunk = qChunks.slice(i, i + 8).join(' ');
+      if (lower.indexOf(chunk) >= 0){ questionVerbatim = true; break; }
+    }
+  }
+
+  /* Topic identification + required content check */
+  let identifiedTopic = null;
+  let topicMatchScore = 0;
+  if (question && typeof TOPIC_KEYWORDS !== 'undefined'){
+    const qL = question.toLowerCase();
+    Object.keys(TOPIC_KEYWORDS).forEach(function(tid){
+      let score = 0;
+      TOPIC_KEYWORDS[tid].forEach(function(kw){ if (qL.indexOf(kw) >= 0) score++; });
+      if (score > topicMatchScore){ topicMatchScore = score; identifiedTopic = tid; }
+    });
+  }
+  let missingRequiredScholars = [];
+  let missingRequiredConcepts = [];
+  if (identifiedTopic && typeof TOPIC_REQUIREMENTS !== 'undefined' && TOPIC_REQUIREMENTS[identifiedTopic]){
+    const req = TOPIC_REQUIREMENTS[identifiedTopic];
+    missingRequiredScholars = (req.scholars || []).filter(function(s){ return scholars.indexOf(s) < 0; });
+    missingRequiredConcepts = (req.concepts || []).filter(function(c){ return lower.indexOf(c) < 0; });
+  }
+
   return {
     wordCount: wordCount, paragraphs: paraCount, bodyParaCount: bodyCount,
     scholars: scholars, scholarsArgumentative: scholarsArgumentative,
@@ -673,7 +727,16 @@ function detectInEssay(essay, question){
     embeddedEvaluation: evaluationParas / bodyCount,
     topicSentenceFocus: topicFocus / bodyCount,
     paragraphsWithFullStructure: paragraphsWithFullStructure,
-    sustainedReasoning: sustainedReasoning
+    sustainedReasoning: sustainedReasoning,
+    justifiedEvaluation: justifiedEvaluation,
+    comparativeReasoning: comparativeReasoning,
+    astarSignatures: astarSignatures,
+    quoteStuffRatio: quoteStuffRatio,
+    scholarListingSentences: scholarListingSentences,
+    questionVerbatim: questionVerbatim,
+    identifiedTopic: identifiedTopic,
+    missingRequiredScholars: missingRequiredScholars,
+    missingRequiredConcepts: missingRequiredConcepts
   };
 }
 
@@ -691,12 +754,18 @@ function suggestAO1(d){
   const words = d.wordCount;
   const qc = d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal;
   const tsf = d.topicSentenceFocus;
-  /* Question focus combined: TSF weighted (deeper signal) plus coverage */
   const focus = qc * 0.3 + tsf * 0.7;
-  /* Each level requires ALL criteria. Order: check L6 down */
-  if (argScholars >= 5 && tech >= 6 && words >= 600 && focus >= 0.6 && tsf >= 0.5) return 6;
-  if (argScholars >= 4 && tech >= 5 && words >= 500 && focus >= 0.5 && tsf >= 0.4) return 5;
-  if (argScholars >= 3 && tech >= 3 && words >= 400 && focus >= 0.35) return 4;
+  /* New requirement: L5+ needs no critical content missing if topic identified */
+  const requiredMissing = (d.missingRequiredScholars || []).length + (d.missingRequiredConcepts || []).length;
+  /* L6: examiners say "extensive scholarly range" + "thorough, precise" technical use.
+     Tighter than before: 6+ argumentative scholars, 7+ technical terms, 650+ words,
+     all required content present, 55%+ TSF. Quote-stuffing or scholar-listing demotes. */
+  if (argScholars >= 6 && tech >= 7 && words >= 650 && tsf >= 0.55 && focus >= 0.6 &&
+      requiredMissing === 0 && d.quoteStuffRatio < 0.2 && d.scholarListingSentences <= 1) return 6;
+  /* L5: requires solid deployment + most required content + decent focus */
+  if (argScholars >= 4 && tech >= 5 && words >= 500 && tsf >= 0.4 && focus >= 0.5 &&
+      requiredMissing <= 2 && d.quoteStuffRatio < 0.25) return 5;
+  if (argScholars >= 3 && tech >= 3 && words >= 400 && focus >= 0.32) return 4;
   if (argScholars >= 2 && tech >= 2 && words >= 280 && focus >= 0.2) return 3;
   if ((argScholars >= 1 || tech >= 1) && words >= 150) return 2;
   return 1;
@@ -722,12 +791,25 @@ function suggestAO2(d){
   const hasIntro = d.hasIntro;
   const hasConc = d.hasConclusion;
   const ties = d.conclusionTiesBack;
-  /* L6: confident sustained argument, precise question focus, every paragraph evaluates */
-  if (fullStruct >= 3 && dial >= 2 && sustained >= 5 && hasIntro && ties && embedded >= 0.7 && focus >= 0.55 && tsf >= 0.55 && words >= 600) return 6;
-  /* L5: well-developed sustained reasoning, good dialectic */
-  if (fullStruct >= 2 && dial >= 2 && sustained >= 3 && hasIntro && hasConc && embedded >= 0.55 && focus >= 0.45 && words >= 500) return 5;
-  /* L4: general success, well-developed but maybe uneven */
-  if (fullStruct >= 1 && dial >= 1 && hasConc && embedded >= 0.4 && focus >= 0.35 && words >= 380) return 4;
+  const justEval = d.justifiedEvaluation || 0;
+  const comparative = d.comparativeReasoning || 0;
+  const astar = (d.astarSignatures || []).length;
+  /* L6: examiners require "excellent line of reasoning, well-developed and sustained" PLUS
+     "confident and insightful critical analysis" PLUS "skilfully and clearly stated, coherently
+     developed and justified" PLUS "answers the question precisely throughout". So we need:
+     - dialectical pairs AND comparative reasoning (not juxtaposition)
+     - justified evaluation (counter + because)
+     - A-star signature moves (concession-pivot, ranking, cumulative verdict, reframing)
+     - sustained thesis recurrence
+     - tied-back conclusion */
+  if (fullStruct >= 3 && dial >= 2 && comparative >= 2 && justEval >= 3 && astar >= 2 &&
+      sustained >= 5 && hasIntro && ties && embedded >= 0.7 && focus >= 0.55 && tsf >= 0.5 &&
+      words >= 650 && !d.questionVerbatim) return 6;
+  /* L5: well-developed sustained reasoning, real dialectic, some comparative work */
+  if (fullStruct >= 2 && dial >= 2 && (comparative >= 1 || astar >= 1) && justEval >= 2 &&
+      sustained >= 3 && hasIntro && hasConc && embedded >= 0.55 && focus >= 0.45 && words >= 500) return 5;
+  /* L4: general success, evaluative attempts but maybe missing comparative force */
+  if (fullStruct >= 1 && dial >= 1 && justEval >= 1 && hasConc && embedded >= 0.4 && focus >= 0.35 && words >= 380) return 4;
   /* L3: partially successful, some structure */
   if (dial >= 1 && embedded >= 0.25 && words >= 260) return 3;
   /* L2: some argument attempted */
@@ -791,28 +873,37 @@ function diagPct(label, val, target){
 /* What specifically does the essay lack to reach AO1 level L? */
 function whatIsMissingAO1(d, L){
   const reqs = {
-    6: { arg: 5, tech: 6, words: 600, tsf: 0.5, focus: 0.6 },
-    5: { arg: 4, tech: 5, words: 500, tsf: 0.4, focus: 0.5 },
-    4: { arg: 3, tech: 3, words: 400, tsf: 0,   focus: 0.35 },
-    3: { arg: 2, tech: 2, words: 280, tsf: 0,   focus: 0.2  }
+    6: { arg: 6, tech: 7, words: 650, tsf: 0.55, focus: 0.6, reqContent: true },
+    5: { arg: 4, tech: 5, words: 500, tsf: 0.4,  focus: 0.5, reqContent: 'most' },
+    4: { arg: 3, tech: 3, words: 400, tsf: 0,    focus: 0.32 },
+    3: { arg: 2, tech: 2, words: 280, tsf: 0,    focus: 0.2  }
   };
   const r = reqs[L];
   if (!r) return [];
   const miss = [];
-  if (d.scholarsArgumentative.length < r.arg) miss.push('deploy ' + (r.arg - d.scholarsArgumentative.length) + ' more scholar(s) argumentatively (use verbs like "argues", "responds")');
-  if (d.technicalTerms.length < r.tech) miss.push('use ' + (r.tech - d.technicalTerms.length) + ' more technical term(s)');
+  if (d.scholarsArgumentative.length < r.arg) miss.push('deploy ' + (r.arg - d.scholarsArgumentative.length) + ' more scholar(s) argumentatively (with verbs like "argues", "responds")');
+  if (d.technicalTerms.length < r.tech) miss.push('use ' + (r.tech - d.technicalTerms.length) + ' more technical term(s) in context');
   if (d.wordCount < r.words) miss.push('extend to at least ' + r.words + ' words (current ' + d.wordCount + ')');
   if (r.tsf > 0 && d.topicSentenceFocus < r.tsf) miss.push('make ' + Math.round(r.tsf * 100) + '% of body topic sentences address the question (current ' + Math.round(d.topicSentenceFocus * 100) + '%)');
   const focus = (d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal) * 0.3 + d.topicSentenceFocus * 0.7;
   if (focus < r.focus) miss.push('sharpen question focus (currently ' + Math.round(focus * 100) + '%, need ' + Math.round(r.focus * 100) + '%)');
+  if (r.reqContent === true && (d.missingRequiredScholars.length || d.missingRequiredConcepts.length)){
+    const all = d.missingRequiredScholars.concat(d.missingRequiredConcepts);
+    if (all.length) miss.push('engage with core content for this topic: ' + all.join(', '));
+  } else if (r.reqContent === 'most' && (d.missingRequiredScholars.length + d.missingRequiredConcepts.length) > 2){
+    const all = d.missingRequiredScholars.concat(d.missingRequiredConcepts).slice(0, 3);
+    if (all.length) miss.push('cover more core content: ' + all.join(', '));
+  }
+  if (L >= 6 && d.quoteStuffRatio >= 0.2) miss.push('reduce quote-stuffing (currently ' + Math.round(d.quoteStuffRatio * 100) + '% inside quote marks)');
+  if (L >= 6 && d.scholarListingSentences > 1) miss.push('break up scholar-listing sentences (' + d.scholarListingSentences + ' detected)');
   return miss;
 }
 
 function whatIsMissingAO2(d, L){
   const reqs = {
-    6: { full: 3, dial: 2, sustained: 5, embedded: 0.7, focus: 0.55, intro: true, ties: true, words: 600 },
-    5: { full: 2, dial: 2, sustained: 3, embedded: 0.55, focus: 0.45, intro: true, conc: true, words: 500 },
-    4: { full: 1, dial: 1, embedded: 0.4, focus: 0.35, conc: true, words: 380 },
+    6: { full: 3, dial: 2, comp: 2, justEval: 3, astar: 2, sustained: 5, embedded: 0.7, focus: 0.55, intro: true, ties: true, words: 650, noVerbatim: true },
+    5: { full: 2, dial: 2, comp: 1, justEval: 2, sustained: 3, embedded: 0.55, focus: 0.45, intro: true, conc: true, words: 500 },
+    4: { full: 1, dial: 1, justEval: 1, embedded: 0.4, focus: 0.35, conc: true, words: 380 },
     3: { dial: 1, embedded: 0.25, words: 260 }
   };
   const r = reqs[L];
@@ -820,8 +911,14 @@ function whatIsMissingAO2(d, L){
   const miss = [];
   if (r.full && d.paragraphsWithFullStructure < r.full) miss.push('build ' + (r.full - d.paragraphsWithFullStructure) + ' more full paragraph(s) — scholar + evaluation + reasoning together');
   if (r.dial && d.dialecticalPairs < r.dial) miss.push('add ' + (r.dial - d.dialecticalPairs) + ' more substantive counter-move(s) (raise + answer an objection)');
+  if (r.comp && (d.comparativeReasoning || 0) < r.comp) miss.push('add comparative reasoning: "X is more convincing than Y because..."; not juxtaposition');
+  if (r.justEval && (d.justifiedEvaluation || 0) < r.justEval) miss.push('add justification after each evaluation: "however X fails BECAUSE Y" (currently ' + (d.justifiedEvaluation || 0) + ')');
+  if (r.astar && (d.astarSignatures || []).length < r.astar) miss.push('use A★ moves: "the sharpest objection", "proves too much", "depends entirely on", "cuts both ways", "concede", "the verdict is"');
   if (r.sustained && d.sustainedReasoning < r.sustained) miss.push('thread thesis through paragraphs more clearly — currently ' + d.sustainedReasoning + ' key words recur');
-  if (r.embedded && d.embeddedEvaluation < r.embedded) miss.push('add evaluation to ' + Math.round((r.embedded - d.embeddedEvaluation) * d.bodyParaCount) + ' more body paragraph(s) (currently ' + Math.round(d.embeddedEvaluation * 100) + '%)');
+  if (r.embedded && d.embeddedEvaluation < r.embedded){
+    const need = Math.ceil((r.embedded - d.embeddedEvaluation) * d.bodyParaCount);
+    if (need > 0) miss.push('add evaluation to ' + need + ' more body paragraph(s) (currently ' + Math.round(d.embeddedEvaluation * 100) + '%)');
+  }
   if (r.focus){
     const focus = (d.questionTermTotal === 0 ? 1 : d.questionTermsHit / d.questionTermTotal) * 0.3 + d.topicSentenceFocus * 0.7;
     if (focus < r.focus) miss.push('sharpen question focus throughout');
@@ -830,6 +927,7 @@ function whatIsMissingAO2(d, L){
   if (r.conc && !d.hasConclusion) miss.push('add a clear conclusion with verdict language ("in conclusion", "ultimately", "the strongest view is")');
   if (r.ties && !d.conclusionTiesBack) miss.push('the conclusion must mention the question\'s key terms');
   if (r.words && d.wordCount < r.words) miss.push('extend to at least ' + r.words + ' words');
+  if (r.noVerbatim && d.questionVerbatim) miss.push('paraphrase the question rather than repeating it verbatim');
   return miss;
 }
 
@@ -894,10 +992,38 @@ function drawRubric(d, m){
     diag('Conclusion ties back to question', d.conclusionTiesBack) +
     diagN('Body paragraphs with full structure (scholar + reasoning + evaluation)', d.paragraphsWithFullStructure, 3) +
     diagN('Substantive dialectical pairs (counter + length)', d.dialecticalPairs, 2) +
+    diagN('Justified evaluation (counter + reasoning)', d.justifiedEvaluation || 0, 3) +
+    diagN('Comparative reasoning ("stronger than", "more convincing because")', d.comparativeReasoning || 0, 2) +
+    diagN('A★ signature moves (concession-pivot, ranking, etc.)', (d.astarSignatures || []).length, 2) +
     diagPct('Body paragraphs evaluating, not just describing', d.embeddedEvaluation, 0.7) +
     diagPct('Topic sentences that focus on the question', d.topicSentenceFocus, 0.55) +
     diagN('Sustained reasoning (thesis words recurring)', d.sustainedReasoning, 5) +
     '</div></div>';
+
+  /* Weak-pattern warnings */
+  const weakIssues = [];
+  if (d.quoteStuffRatio > 0.2) weakIssues.push('Quote-stuffing: ' + Math.round(d.quoteStuffRatio * 100) + '% of essay is inside quotation marks. Examiners reward analysis of quotes, not transcription.');
+  if (d.scholarListingSentences >= 2) weakIssues.push('Scholar-listing detected: ' + d.scholarListingSentences + ' sentences name 3+ scholars together. Engage with each individually.');
+  if (d.questionVerbatim) weakIssues.push('Question repeated verbatim. Paraphrase and respond, do not just echo.');
+  if (weakIssues.length){
+    html += '<div class="detected-list"><div class="detected-list-label" style="color:var(--claret)">Weak patterns examiners flag</div><ul style="list-style:none;padding-left:0;margin:0.3rem 0;font-size:0.82rem;line-height:1.5">';
+    weakIssues.forEach(function(w){ html += '<li style="padding:0.25rem 0 0.25rem 1rem;position:relative"><span style="position:absolute;left:0;color:var(--claret);font-weight:700">!</span>' + w + '</li>'; });
+    html += '</ul></div>';
+  }
+
+  /* Topic-specific required content */
+  if (d.identifiedTopic && (d.missingRequiredScholars.length || d.missingRequiredConcepts.length)){
+    const topicName = CONTENT['01'].topics.concat(CONTENT['02'].topics, CONTENT['03'].topics).find(function(t){ return t.id === d.identifiedTopic; });
+    const topicTitle = topicName ? stripHtml(topicName.title) : d.identifiedTopic;
+    html += '<div class="detected-list"><div class="detected-list-label" style="color:var(--ochre)">Topic detected: ' + topicTitle + '</div>';
+    if (d.missingRequiredScholars.length){
+      html += '<div style="font-size:0.82rem;color:var(--ink);margin:0.3rem 0"><strong style="color:var(--claret)">Missing core scholars:</strong> ' + d.missingRequiredScholars.join(', ') + '. An L5+ essay on this topic should engage with these.</div>';
+    }
+    if (d.missingRequiredConcepts.length){
+      html += '<div style="font-size:0.82rem;color:var(--ink);margin:0.3rem 0"><strong style="color:var(--claret)">Missing core concepts:</strong> ' + d.missingRequiredConcepts.join(', ') + '.</div>';
+    }
+    html += '</div>';
+  }
   /* What's missing for next level */
   const nextAO1 = Math.min(6, m.ao1L + 1);
   const nextAO2 = Math.min(6, m.ao2L + 1);
