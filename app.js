@@ -634,6 +634,10 @@ function detectInEssay(essay, question){
   const hasConclusion = lastPara.length > 80 && VERDICT_MARKERS.some(function(m){ return lastPL.indexOf(m) >= 0; });
   /* Conclusion must mention 2+ key question terms to count as "ties back" */
   const conclusionTiesBack = hasConclusion && qTerms.filter(function(t){ return lastPL.indexOf(t) >= 0; }).length >= 2;
+  /* Conclusion COMMITS to a position rather than fence-sitting. Examiner reports flag
+     "arguments on both sides" / "to some extent" / "in some ways" conclusions as a L3/L4 cap. */
+  const fenceSittingPhrases = ['both sides have','arguments on both sides','arguments for both','both sides of','it depends','to some extent','to an extent','in some ways','some might argue','partly true','partly false','partially right','some truth','elements of truth','no clear answer','difficult to say','impossible to say','open question','remains open','ongoing debate','will continue to be debated','people will continue','it is up to','personal opinion'];
+  const conclusionCommits = hasConclusion && !fenceSittingPhrases.some(function(p){ return lastPL.indexOf(p) >= 0; }) && (VERDICT_MARKERS.some(function(m){ return lastPL.indexOf(m) >= 0; }) || /\b(the strongest|the most|fails|succeeds|cannot|must be|is therefore|is thus|is ultimately)\b/i.test(lastPara));
 
   /* Body paragraphs — track richer structure */
   const bodyParas = paragraphs.slice(1, Math.max(1, paraCount - 1));
@@ -781,7 +785,7 @@ function detectInEssay(essay, question){
     scholars: scholars, scholarsArgumentative: scholarsArgumentative,
     technicalTerms: technicalTerms, counterMoves: counterMoves,
     thesisMarkers: thesisMarkers, verdictMarkers: verdictMarkers, evaluationMarkers: evaluationMarkers,
-    hasIntro: hasIntro, hasConclusion: hasConclusion, conclusionTiesBack: conclusionTiesBack,
+    hasIntro: hasIntro, hasConclusion: hasConclusion, conclusionTiesBack: conclusionTiesBack, conclusionCommits: conclusionCommits,
     questionTermsHit: questionTermsHit, questionTermTotal: qTerms.length,
     dialecticalPairs: dialecticalPairs,
     embeddedEvaluation: evaluationParas / bodyCount,
@@ -893,11 +897,14 @@ function suggestAO1(d){
 /* AO2 holistic scoring. Five-ish components, each 0-3, mapped to level by best-fit. */
 function suggestAO2(d){
   if (d.wordCount === 0) return 1;
-  /* Component A: argument structure (intro + body + conclusion) (0-3) */
+  /* Component A: argument structure (intro + body + conclusion + commitment) (0-3) */
   let structureScore = 0;
   if (d.hasIntro) structureScore += 1;
-  if (d.hasConclusion) structureScore += 1;
-  if (d.conclusionTiesBack) structureScore += 1;
+  if (d.hasConclusion) structureScore += 0.5;
+  if (d.conclusionTiesBack) structureScore += 0.5;
+  if (d.conclusionCommits) structureScore += 1;
+  /* Examiners explicitly flag fence-sitting as a L3/L4 cap. Even if other parts are
+     strong, a non-committal conclusion stops top-band marks. */
   /* Component B: dialectical engagement (0-3) */
   let dialScore = 0;
   const dial = d.dialecticalPairs;
@@ -978,6 +985,26 @@ function markInLevel(level, pos, levels){
   return Math.min(hi, Math.max(lo, lo + pos));
 }
 
+/* Calculate the within-level position (0-3) based on how far an essay's total
+   sits within its level band. Smoother than a fixed default. Position 0 = just
+   into the band; position 3 = about to break into the next band up. */
+function autoPosition(total, level, bands){
+  /* Compute within-level position 0-3 from how far the essay's total sits within
+     its level band. Defaults to position 2 (mid-band) for most cases, since real
+     examiners typically award mid-band marks unless evidence pushes higher/lower. */
+  const range = bands[level];
+  if (!range) return 2;
+  const lo = range[0], hi = range[1];
+  if (hi <= lo) return 2;
+  const frac = Math.min(1, Math.max(0, (total - lo) / (hi - lo)));
+  if (frac >= 0.85) return 3;
+  if (frac >= 0.4) return 2;
+  if (frac >= 0.15) return 2;  /* still mid-band */
+  return 1;  /* bottom of band, but not extreme */
+}
+const AO1_BANDS = { 6:[13, 16], 5:[11, 13], 4:[8.5, 11], 3:[6, 8.5], 2:[3.5, 6], 1:[0, 3.5] };
+const AO2_BANDS = { 6:[13, 16], 5:[10.5, 13], 4:[8, 10.5], 3:[5.5, 8], 2:[3, 5.5], 1:[0, 3] };
+
 function computeMarks(d){
   const ao1Result = suggestAO1(d);
   const ao2Result = suggestAO2(d);
@@ -985,8 +1012,13 @@ function computeMarks(d){
   const autoAO2 = ao2Result.level;
   const ao1L = MARKER_STATE.ao1Level != null ? MARKER_STATE.ao1Level : autoAO1;
   const ao2L = MARKER_STATE.ao2Level != null ? MARKER_STATE.ao2Level : autoAO2;
-  const ao1P = MARKER_STATE.ao1Pos != null ? MARKER_STATE.ao1Pos : 2;
-  const ao2P = MARKER_STATE.ao2Pos != null ? MARKER_STATE.ao2Pos : 2;
+  /* Auto-position is now derived from how far the total sits within the band.
+     Only used when user hasn't overridden, AND when the user-selected level
+     matches the auto-suggested level (otherwise default to 2). */
+  const autoAO1P = ao1L === autoAO1 ? autoPosition(ao1Result.total, ao1L, AO1_BANDS) : 2;
+  const autoAO2P = ao2L === autoAO2 ? autoPosition(ao2Result.total, ao2L, AO2_BANDS) : 2;
+  const ao1P = MARKER_STATE.ao1Pos != null ? MARKER_STATE.ao1Pos : autoAO1P;
+  const ao2P = MARKER_STATE.ao2Pos != null ? MARKER_STATE.ao2Pos : autoAO2P;
   const ao1Mark = markInLevel(ao1L, ao1P, AO1_LEVELS);
   const ao2Mark = markInLevel(ao2L, ao2P, AO2_LEVELS);
   return {
@@ -994,6 +1026,7 @@ function computeMarks(d){
     ao1Mark: ao1Mark, ao2Mark: ao2Mark,
     total: ao1Mark + ao2Mark,
     autoAO1: autoAO1, autoAO2: autoAO2,
+    autoAO1P: autoAO1P, autoAO2P: autoAO2P,
     ao1Result: ao1Result, ao2Result: ao2Result
   };
 }
@@ -1191,6 +1224,7 @@ function drawRubric(d, m){
     diag('Intro with thesis', d.hasIntro) +
     diag('Conclusion with verdict', d.hasConclusion) +
     diag('Conclusion ties back to question', d.conclusionTiesBack) +
+    diag('Conclusion commits to a position (not fence-sitting)', d.conclusionCommits) +
     diagN('Body paragraphs with full structure (scholar + reasoning + evaluation)', d.paragraphsWithFullStructure, 3) +
     diagN('Substantive dialectical pairs (counter + length)', d.dialecticalPairs, 2) +
     diagN('Justified evaluation (counter + reasoning)', d.justifiedEvaluation || 0, 3) +

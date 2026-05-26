@@ -390,7 +390,17 @@ const TECHNICAL_TERMS = ['a posteriori','a priori','noetic','ineffable','transie
 
 const THESIS_MARKERS = ['i will argue','this essay will argue','this essay argues','i shall argue','i contend',
   'i maintain','ultimately','in this essay','more convincing','less convincing','more reliable',
-  'most convincing','fails because','succeeds because','my position','this paper argues','i hold that'];
+  'most convincing','fails because','succeeds because','my position','this paper argues','i hold that',
+  /* Broader thesis-committal phrasings that real essays use without "I will argue" */
+  'fails to justify','fails to show','fails to establish','fails to prove','fails to demonstrate',
+  'succeeds in showing','succeeds in justifying','succeeds in establishing',
+  'cannot justify','cannot establish','cannot show','cannot sustain','cannot defend',
+  'cannot be','is illogical','is unjustified','is incoherent','is coherent',
+  'so, the','therefore the','therefore,','thus, the','thus the',
+  'will be argued','it will be shown','this discussion','this argument',
+  'most defensible','least defensible','most plausible','least plausible',
+  'is the strongest','is the weakest','poses a serious','serious threat',
+  'pose a serious','present a serious','offer a serious'];
 
 const VERDICT_MARKERS = ['in conclusion','to conclude','in summary','overall','ultimately','on balance',
   'the strongest','the most convincing','the verdict','thus we should conclude','we should accept'];
@@ -402,7 +412,20 @@ const COUNTER_MOVES = ['however','nevertheless','on the other hand','in contrast
 const EVALUATION_MARKERS = ['however','although','whereas','whilst','nevertheless','this suggests','this implies',
   'this shows','this demonstrates','critics','objection','would argue','is correct','is mistaken',
   'is convincing','is unconvincing','fails because','succeeds because','stronger','weaker',
-  'preferable','therefore','thus','hence','consequently'];
+  'preferable','therefore','thus','hence','consequently',
+  /* Broader evaluative phrasings real essays use */
+  'is strong','is weak','strongly','weakly','is effective','is ineffective','effectively',
+  'is coherent','is incoherent','coherent','incoherent',
+  'is plausible','is implausible','is sound','is unsound',
+  'is valid','is invalid','is justified','is unjustified','is illogical','is logical',
+  'is right','is wrong','is true','is false',
+  'fails to','succeeds in','manages to','struggles to',
+  'commits','straw man','category error','category mistake',
+  'loses its','loses force','loses persuasive','gains','holds','does not hold','still holds',
+  'remains successful','remains coherent','remains intact',
+  'is decisive','is conclusive','is inconclusive','is definitive',
+  'undermines','overturns','refutes','rebuts','rebuttal',
+  'is the strongest','is the weakest','most defensible','least defensible'];
 
 /* A-star signature moves: specific phrasings that examiners flag as marks of sophisticated argument.
    Concession-pivot, ranking objections, cumulative verdict, modus tollens chains, reframing. */
