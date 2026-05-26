@@ -571,7 +571,23 @@ function renderMarker(paper){
 function detectInEssay(essay, question){
   const empty = { wordCount: 0, paragraphs: 0, bodyParaCount: 0, scholars: [], scholarsArgumentative: [], technicalTerms: [], counterMoves: [], thesisMarkers: [], verdictMarkers: [], evaluationMarkers: [], hasIntro: false, hasConclusion: false, conclusionTiesBack: false, questionTermsHit: 0, questionTermTotal: 0, topicSentenceFocus: 0, embeddedEvaluation: 0, dialecticalPairs: 0, paragraphsWithFullStructure: 0, sustainedReasoning: 0 };
   if (!essay || essay.trim().length < 50) return empty;
-  const text = essay.trim();
+  let text = essay.trim();
+  /* Strip a copied question line from the start of the essay. Students often paste:
+       'X is true.' Discuss.
+       <newline>
+       The actual essay...
+     The question line was being treated as the intro paragraph, hiding the real one.
+     Look for first line ending with 'Discuss' or '[40]' (the canonical question terminators)
+     and strip everything up to and including it, but only if the essay continues afterwards. */
+  if (question && question.length > 10){
+    const firstChunk = text.substring(0, 500);
+    const cutMatch = firstChunk.match(/^[^\n]*?(?:\bDiscuss\.?|\[\d+\])\s*(?:\n|$)/i);
+    if (cutMatch){
+      const after = text.substring(cutMatch[0].length).trim();
+      /* Only strip if there's substantial essay text remaining */
+      if (after.length > 200) text = after;
+    }
+  }
   const lower = text.toLowerCase();
   const wordCount = (text.match(/\S+/g) || []).length;
   /* Paragraph detection — try double-newline first, fall back to single-newline,
@@ -630,7 +646,16 @@ function detectInEssay(essay, question){
   const lastPara = paragraphs[paraCount - 1] || '';
   const firstPL = firstPara.toLowerCase();
   const lastPL = lastPara.toLowerCase();
-  const hasIntro = firstPara.length > 100 && THESIS_MARKERS.some(function(m){ return firstPL.indexOf(m) >= 0; });
+  /* hasIntro: substantial first paragraph that either matches a thesis marker OR ends with
+     a clearly committal sentence (e.g. "X is not Y", "X fails to Y", "X cannot Y"). Real essays
+     often state their thesis in the closing line of the intro without using formal markers. */
+  const firstParaSentences = firstPara.split(/[.!?]+/).filter(function(s){ return s.trim().length > 10; });
+  const lastIntroSentence = (firstParaSentences[firstParaSentences.length - 1] || '').toLowerCase();
+  const committalPatterns = /\b(?:is not|isn't|cannot|can't|fails|succeeds|is the (?:strongest|weakest|best|most|least)|is best|is not best|is therefore|is thus|must be|is ultimately|is inherently|is fundamentally)\b/;
+  const hasIntro = firstPara.length > 100 && (
+    THESIS_MARKERS.some(function(m){ return firstPL.indexOf(m) >= 0; }) ||
+    committalPatterns.test(lastIntroSentence)
+  );
   const hasConclusion = lastPara.length > 80 && VERDICT_MARKERS.some(function(m){ return lastPL.indexOf(m) >= 0; });
   /* Conclusion must mention 2+ key question terms to count as "ties back" */
   const conclusionTiesBack = hasConclusion && qTerms.filter(function(t){ return lastPL.indexOf(t) >= 0; }).length >= 2;
@@ -872,13 +897,18 @@ function suggestAO1(d){
     scholar: scholarScore, tech: techScore, length: lenScore,
     focus: focusScore, content: contentScore
   };
+  /* Uniform-excellence bonus: examiners reward essays that are strong across all
+     dimensions, not just totals. If the weakest component is still at maximum,
+     add half a point — pushes consistently-strong essays into the top of their band. */
+  const ao1Min = Math.min(scholarScore, techScore, lenScore, focusScore, contentScore);
+  if (ao1Min >= 3) total += 0.5;
   /* Penalties */
   let penalties = 0;
   if (d.quoteStuffRatio > 0.3){ total -= 1; penalties -= 1; }
   if (d.scholarListingSentences >= 3){ total -= 0.5; penalties -= 0.5; }
   if (d.wordCount < 200){ total -= 1; penalties -= 1; }
   let level;
-  if (total >= 13) level = 6;
+  if (total >= 14) level = 6;
   else if (total >= 11) level = 5;
   else if (total >= 8.5) level = 4;
   else if (total >= 6) level = 3;
@@ -957,13 +987,16 @@ function suggestAO2(d){
     structure: structureScore, dialectic: dialScore,
     evaluation: evalScore, astar: astarScore, coherence: coherenceScore
   };
+  /* Same uniform-excellence bonus for AO2: weakest component at max → +0.5 */
+  const ao2Min = Math.min(structureScore, dialScore, evalScore, astarScore, coherenceScore);
+  if (ao2Min >= 3) total += 0.5;
   let penalties = 0;
   if (d.wordCount < 200){ total -= 2; penalties -= 2; }
   if (d.questionVerbatim){ total -= 0.5; penalties -= 0.5; }
   if (d.quoteStuffRatio > 0.3){ total -= 1; penalties -= 1; }
   let level;
-  if (total >= 13) level = 6;
-  else if (total >= 10.5) level = 5;
+  if (total >= 13.5) level = 6;
+  else if (total >= 11) level = 5;
   else if (total >= 8) level = 4;
   else if (total >= 5.5) level = 3;
   else if (total >= 3) level = 2;
@@ -989,21 +1022,22 @@ function markInLevel(level, pos, levels){
    sits within its level band. Smoother than a fixed default. Position 0 = just
    into the band; position 3 = about to break into the next band up. */
 function autoPosition(total, level, bands){
-  /* Compute within-level position 0-3 from how far the essay's total sits within
-     its level band. Defaults to position 2 (mid-band) for most cases, since real
-     examiners typically award mid-band marks unless evidence pushes higher/lower. */
+  /* Compute within-level position 0-3 from where the essay sits in its band.
+     Default position 2 (mid-band, "slight inconsistency") matches OCR's typical mark.
+     Position 3 ("consistently meets") requires sitting in the top 30% of band.
+     Position 1 ("just enough on balance") for bottom 20%. */
   const range = bands[level];
   if (!range) return 2;
   const lo = range[0], hi = range[1];
   if (hi <= lo) return 2;
   const frac = Math.min(1, Math.max(0, (total - lo) / (hi - lo)));
-  if (frac >= 0.85) return 3;
-  if (frac >= 0.4) return 2;
-  if (frac >= 0.15) return 2;  /* still mid-band */
-  return 1;  /* bottom of band, but not extreme */
+  if (frac >= 0.7) return 3;
+  if (frac >= 0.2) return 2;
+  return 1;
 }
-const AO1_BANDS = { 6:[13, 16], 5:[11, 13], 4:[8.5, 11], 3:[6, 8.5], 2:[3.5, 6], 1:[0, 3.5] };
-const AO2_BANDS = { 6:[13, 16], 5:[10.5, 13], 4:[8, 10.5], 3:[5.5, 8], 2:[3, 5.5], 1:[0, 3] };
+/* Tightened band thresholds. The previous cutoffs let too many essays slip into L6. */
+const AO1_BANDS = { 6:[14, 16], 5:[11, 14], 4:[8.5, 11], 3:[6, 8.5], 2:[3.5, 6], 1:[0, 3.5] };
+const AO2_BANDS = { 6:[13.5, 16], 5:[11, 13.5], 4:[8, 11], 3:[5.5, 8], 2:[3, 5.5], 1:[0, 3] };
 
 function computeMarks(d){
   const ao1Result = suggestAO1(d);
