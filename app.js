@@ -150,12 +150,97 @@ function closeScholar(){ document.getElementById('scholar-modal').classList.remo
 
 function renderPaper(paperId){
   if (paperId === '07') return (typeof renderGizmo === 'function') ? renderGizmo() : null;
+  if (paperId === '08') return renderPlans();
   const paper = CONTENT[paperId];
   if (!paper) return;
   if (paperId === '04') return renderCraft(paper);
   if (paperId === '05') return renderReference(paper);
   if (paperId === '06') return renderMarker(paper);
   return renderTopicPaper(paperId, paper);
+}
+
+function renderPlans(){
+  const main = document.getElementById('main');
+  const toc = document.getElementById('toc-list');
+  if (typeof ESSAY_PLANS === 'undefined' || !ESSAY_PLANS.length){
+    main.innerHTML = '<div class="app-loading">Essay plans not loaded.</div>';
+    return;
+  }
+  const tocProgress = document.getElementById('toc-progress');
+  if (tocProgress) tocProgress.style.display = 'none';
+  const tocTools = document.getElementById('toc-tools');
+  if (tocTools) tocTools.style.display = 'none';
+
+  let html = '<section class="paper-section active" data-paper="08">' +
+    '<div class="paper-intro"><div class="eyebrow" style="color:var(--gold)">Essay plans &middot; OCR H573</div>' +
+    '<h1>Essay <em style="color:var(--gold)">Plans</em></h1>' +
+    '<p class="lede">Model essay plans for the major H573 exam questions. Each plan shows the committed thesis, paragraph-by-paragraph structure with scholars, counter-arguments and responses, and the verdict. Where a plan is marked with a grade, it is calibrated against a real examiner mark.</p></div>' +
+    '<div class="plans-intro">Each plan is a skeleton, not a finished essay. Use them to learn the <strong>architecture</strong> of a strong response: thesis upfront, scholars deployed argumentatively (not just named), dialectical structure (claim → counter → response), and a conclusion that commits.</div>' +
+    '<div class="plans-filter" id="plans-filter">' +
+      '<button data-pf="all" class="active">All ' + ESSAY_PLANS.length + '</button>' +
+      '<button data-pf="01">Paper 01</button>' +
+      '<button data-pf="02">Paper 02</button>' +
+      '<button data-pf="03">Paper 03</button>' +
+    '</div>' +
+    '<div id="plans-list">';
+
+  ESSAY_PLANS.forEach(function(plan){
+    html += renderSinglePlan(plan);
+  });
+
+  html += '</div></section>';
+  main.innerHTML = html;
+
+  toc.innerHTML = ESSAY_PLANS.map(function(p){
+    return '<li><a href="#plan-' + p.id + '">' + p.topic + '</a></li>';
+  }).join('');
+
+  document.querySelectorAll('#plans-filter button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#plans-filter button').forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      const filter = b.dataset.pf;
+      const list = document.getElementById('plans-list');
+      list.innerHTML = ESSAY_PLANS
+        .filter(function(p){ return filter === 'all' || p.paper === filter; })
+        .map(renderSinglePlan)
+        .join('');
+    });
+  });
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderSinglePlan(plan){
+  const hasMarks = !!plan.examMarks;
+  let html = '<article class="plan-section ' + (hasMarks ? 'exemplar' : '') + '" id="plan-' + plan.id + '">' +
+    '<div class="plan-meta">Paper ' + plan.paper + ' &middot; ' + plan.topic + '</div>' +
+    '<div class="plan-q">' + plan.question + '</div>';
+  if (hasMarks){
+    html += '<div class="plan-marks">' + plan.examMarks + '</div>';
+  }
+  html += '<div class="plan-thesis"><span class="plan-thesis-label">A&#9733; Thesis</span>' + plan.thesis + '</div>';
+  plan.paragraphs.forEach(function(p, i){
+    html += '<div class="plan-para">' +
+      '<span class="plan-para-num">&para; ' + (i + 1) + '</span>' +
+      '<div class="plan-para-topic">' + p.topic + '</div>';
+    if (p.scholars && p.scholars.length){
+      html += '<div class="plan-para-block"><span class="plan-para-label">Scholars to deploy</span>' +
+        '<div class="plan-scholar-list">' +
+        p.scholars.map(function(s){ return '<span class="plan-scholar-chip">' + s + '</span>'; }).join('') +
+        '</div></div>';
+    }
+    if (p.argument) html += '<div class="plan-para-block"><span class="plan-para-label">Argument</span><div class="plan-para-text">' + p.argument + '</div></div>';
+    if (p.counter) html += '<div class="plan-para-block"><span class="plan-para-label">Counter</span><div class="plan-para-text">' + p.counter + '</div></div>';
+    if (p.response) html += '<div class="plan-para-block"><span class="plan-para-label">Response</span><div class="plan-para-text">' + p.response + '</div></div>';
+    html += '</div>';
+  });
+  html += '<div class="plan-conclusion"><span class="plan-conclusion-label">Conclusion</span>' + plan.conclusion + '</div>';
+  if (plan.examinerNotes){
+    html += '<div class="plan-examiner"><span class="plan-examiner-label">Examiner notes</span>' + plan.examinerNotes + '</div>';
+  }
+  html += '</article>';
+  return html;
 }
 
 function renderTopicPaper(paperId, paper){
