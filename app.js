@@ -178,10 +178,12 @@ function renderPlans(){
     '<div class="plans-intro">Each plan is a skeleton, not a finished essay. Use them to learn the <strong>architecture</strong> of a strong response: thesis upfront, scholars deployed argumentatively (not just named), dialectical structure (claim → counter → response), and a conclusion that commits.</div>' +
     '<div class="plans-filter" id="plans-filter">' +
       '<button data-pf="all" class="active">All ' + ESSAY_PLANS.length + '</button>' +
-      '<button data-pf="01">Paper 01</button>' +
-      '<button data-pf="02">Paper 02</button>' +
-      '<button data-pf="03">Paper 03</button>' +
+      '<button data-pf="01">Paper 01 (' + ESSAY_PLANS.filter(function(p){return p.paper==="01";}).length + ')</button>' +
+      '<button data-pf="02">Paper 02 (' + ESSAY_PLANS.filter(function(p){return p.paper==="02";}).length + ')</button>' +
+      '<button data-pf="03">Paper 03 (' + ESSAY_PLANS.filter(function(p){return p.paper==="03";}).length + ')</button>' +
+      '<button data-pf="marked">Examiner-marked ★</button>' +
     '</div>' +
+    '<input type="text" id="plans-search" placeholder="Filter by question keyword or topic..." style="width:100%;padding:0.55rem 0.85rem;margin-bottom:1rem;font-family:var(--display);font-style:italic;font-size:1rem;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);border-radius:2px;outline:none">' +
     '<div id="plans-list">';
 
   ESSAY_PLANS.forEach(function(plan){
@@ -195,18 +197,40 @@ function renderPlans(){
     return '<li><a href="#plan-' + p.id + '">' + p.topic + '</a></li>';
   }).join('');
 
+  let currentFilter = 'all';
+  let currentSearch = '';
+  function applyPlansFilter(){
+    const list = document.getElementById('plans-list');
+    const filtered = ESSAY_PLANS.filter(function(p){
+      const paperMatch = currentFilter === 'all' || currentFilter === 'marked' ?
+        (currentFilter === 'marked' ? !!p.examMarks : true) :
+        p.paper === currentFilter;
+      if (!paperMatch) return false;
+      if (!currentSearch) return true;
+      const q = currentSearch.toLowerCase();
+      return p.question.toLowerCase().indexOf(q) >= 0 ||
+             p.topic.toLowerCase().indexOf(q) >= 0 ||
+             p.thesis.toLowerCase().indexOf(q) >= 0;
+    });
+    list.innerHTML = filtered.length ?
+      filtered.map(renderSinglePlan).join('') :
+      '<div style="padding:2rem;text-align:center;color:var(--muted);font-style:italic">No plans match.</div>';
+  }
   document.querySelectorAll('#plans-filter button').forEach(function(b){
     b.addEventListener('click', function(){
       document.querySelectorAll('#plans-filter button').forEach(function(x){ x.classList.remove('active'); });
       b.classList.add('active');
-      const filter = b.dataset.pf;
-      const list = document.getElementById('plans-list');
-      list.innerHTML = ESSAY_PLANS
-        .filter(function(p){ return filter === 'all' || p.paper === filter; })
-        .map(renderSinglePlan)
-        .join('');
+      currentFilter = b.dataset.pf;
+      applyPlansFilter();
     });
   });
+  const plansSearch = document.getElementById('plans-search');
+  if (plansSearch){
+    plansSearch.addEventListener('input', function(){
+      currentSearch = plansSearch.value.trim();
+      applyPlansFilter();
+    });
+  }
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
