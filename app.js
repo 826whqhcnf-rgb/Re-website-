@@ -263,6 +263,15 @@ function renderSinglePlan(plan){
   if (plan.examinerNotes){
     html += '<div class="plan-examiner"><span class="plan-examiner-label">Examiner notes</span>' + plan.examinerNotes + '</div>';
   }
+  /* Niche scholars for the topic */
+  if (typeof NICHE_SCHOLARS !== 'undefined' && NICHE_SCHOLARS[plan.topic]){
+    const niche = NICHE_SCHOLARS[plan.topic];
+    html += '<div class="plan-niche"><span class="plan-niche-label">Wider scholarship for this topic</span>';
+    niche.forEach(function(s){
+      html += '<div class="plan-niche-item"><strong>' + s.name + '</strong>' + (s.area ? ' <em>(' + s.area + ')</em>' : '') + ' — ' + s.position + '</div>';
+    });
+    html += '</div>';
+  }
   html += '</article>';
   return html;
 }
