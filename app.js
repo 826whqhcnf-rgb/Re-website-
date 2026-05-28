@@ -159,6 +159,48 @@ function renderPaper(paperId){
   return renderTopicPaper(paperId, paper);
 }
 
+function buildPlansControls(){
+  /* Build distinct topic list for the topic dropdown */
+  const topicMap = {};
+  ESSAY_PLANS.forEach(function(p){
+    if (!topicMap[p.topic]) topicMap[p.topic] = { paper: p.paper, count: 0 };
+    topicMap[p.topic].count++;
+  });
+  const sortedTopics = Object.keys(topicMap).sort(function(a, b){
+    if (topicMap[a].paper !== topicMap[b].paper) return topicMap[a].paper.localeCompare(topicMap[b].paper);
+    return a.localeCompare(b);
+  });
+  const topicOptions = sortedTopics.map(function(t){
+    return '<option value="' + t.replace(/"/g, '&quot;') + '">P' + topicMap[t].paper + ' · ' + t + ' (' + topicMap[t].count + ')</option>';
+  }).join('');
+  const counts = {
+    all: ESSAY_PLANS.length,
+    p1: ESSAY_PLANS.filter(function(p){return p.paper==="01";}).length,
+    p2: ESSAY_PLANS.filter(function(p){return p.paper==="02";}).length,
+    p3: ESSAY_PLANS.filter(function(p){return p.paper==="03";}).length
+  };
+  return '<div class="plans-controls">' +
+    '<div class="plans-control-row">' +
+      '<label class="plans-control"><span class="plans-control-label">Paper</span>' +
+        '<select id="plans-paper-select" class="plans-select">' +
+          '<option value="all">All papers (' + counts.all + ')</option>' +
+          '<option value="01">Paper 01 · Philosophy of Religion (' + counts.p1 + ')</option>' +
+          '<option value="02">Paper 02 · Religion &amp; Ethics (' + counts.p2 + ')</option>' +
+          '<option value="03">Paper 03 · Christian Thought (' + counts.p3 + ')</option>' +
+          '<option value="marked">★ Examiner-marked only</option>' +
+        '</select>' +
+      '</label>' +
+      '<label class="plans-control"><span class="plans-control-label">Topic</span>' +
+        '<select id="plans-topic-select" class="plans-select">' +
+          '<option value="all">All topics</option>' +
+          topicOptions +
+        '</select>' +
+      '</label>' +
+    '</div>' +
+    '<input type="text" id="plans-search" class="plans-search-input" placeholder="Search by question, scholar, or argument&hellip;">' +
+  '</div>';
+}
+
 function renderPlans(){
   const main = document.getElementById('main');
   const toc = document.getElementById('toc-list');
@@ -176,14 +218,7 @@ function renderPlans(){
     '<h1>Essay <em style="color:var(--gold)">Plans</em></h1>' +
     '<p class="lede">Model essay plans for the major H573 exam questions. Each plan shows the committed thesis, paragraph-by-paragraph structure with scholars, counter-arguments and responses, and the verdict. Where a plan is marked with a grade, it is calibrated against a real examiner mark.</p></div>' +
     '<div class="plans-intro">Each plan is a skeleton, not a finished essay. Use them to learn the <strong>architecture</strong> of a strong response: thesis upfront, scholars deployed argumentatively (not just named), dialectical structure (claim → counter → response), and a conclusion that commits.<br><br><strong style="color:var(--claret);font-style:normal">★ Spec scholars (claret box):</strong> the thinkers OCR explicitly names in the H573 specification. Examiners expect engagement with these for AO1 marks — they are not optional. <strong style="color:var(--ochre);font-style:normal">Wider scholarship (ochre box):</strong> impressive for AO2 depth but does not substitute for spec scholars.</div>' +
-    '<div class="plans-filter" id="plans-filter">' +
-      '<button data-pf="all" class="active">All ' + ESSAY_PLANS.length + '</button>' +
-      '<button data-pf="01">Paper 01 (' + ESSAY_PLANS.filter(function(p){return p.paper==="01";}).length + ')</button>' +
-      '<button data-pf="02">Paper 02 (' + ESSAY_PLANS.filter(function(p){return p.paper==="02";}).length + ')</button>' +
-      '<button data-pf="03">Paper 03 (' + ESSAY_PLANS.filter(function(p){return p.paper==="03";}).length + ')</button>' +
-      '<button data-pf="marked">Examiner-marked ★</button>' +
-    '</div>' +
-    '<input type="text" id="plans-search" placeholder="Filter by question keyword or topic..." style="width:100%;padding:0.55rem 0.85rem;margin-bottom:1rem;font-family:var(--display);font-style:italic;font-size:1rem;background:var(--wash);border:1px solid var(--rule-strong);color:var(--ink);border-radius:2px;outline:none">' +
+    buildPlansControls() +
     '<div id="plans-list">';
 
   ESSAY_PLANS.forEach(function(plan){
@@ -197,33 +232,43 @@ function renderPlans(){
     return '<li><a href="#plan-' + p.id + '">' + p.topic + '</a></li>';
   }).join('');
 
-  let currentFilter = 'all';
+  let currentPaper = 'all';
+  let currentTopic = 'all';
   let currentSearch = '';
   function applyPlansFilter(){
     const list = document.getElementById('plans-list');
     const filtered = ESSAY_PLANS.filter(function(p){
-      const paperMatch = currentFilter === 'all' || currentFilter === 'marked' ?
-        (currentFilter === 'marked' ? !!p.examMarks : true) :
-        p.paper === currentFilter;
+      const paperMatch = currentPaper === 'all' ? true
+                       : currentPaper === 'marked' ? !!p.examMarks
+                       : p.paper === currentPaper;
       if (!paperMatch) return false;
+      if (currentTopic !== 'all' && p.topic !== currentTopic) return false;
       if (!currentSearch) return true;
       const q = currentSearch.toLowerCase();
+      const scholarsInPlan = (p.paragraphs || []).flatMap(function(par){ return par.scholars || []; }).join(' ').toLowerCase();
       return p.question.toLowerCase().indexOf(q) >= 0 ||
              p.topic.toLowerCase().indexOf(q) >= 0 ||
-             p.thesis.toLowerCase().indexOf(q) >= 0;
+             p.thesis.toLowerCase().indexOf(q) >= 0 ||
+             scholarsInPlan.indexOf(q) >= 0;
     });
     list.innerHTML = filtered.length ?
       filtered.map(renderSinglePlan).join('') :
-      '<div style="padding:2rem;text-align:center;color:var(--muted);font-style:italic">No plans match.</div>';
+      '<div style="padding:2.5rem;text-align:center;color:var(--muted);font-style:italic;background:var(--wash);border:1px dashed var(--rule)">No plans match these filters.</div>';
   }
-  document.querySelectorAll('#plans-filter button').forEach(function(b){
-    b.addEventListener('click', function(){
-      document.querySelectorAll('#plans-filter button').forEach(function(x){ x.classList.remove('active'); });
-      b.classList.add('active');
-      currentFilter = b.dataset.pf;
+  const paperSelect = document.getElementById('plans-paper-select');
+  const topicSelect = document.getElementById('plans-topic-select');
+  if (paperSelect){
+    paperSelect.addEventListener('change', function(){
+      currentPaper = paperSelect.value;
       applyPlansFilter();
     });
-  });
+  }
+  if (topicSelect){
+    topicSelect.addEventListener('change', function(){
+      currentTopic = topicSelect.value;
+      applyPlansFilter();
+    });
+  }
   const plansSearch = document.getElementById('plans-search');
   if (plansSearch){
     plansSearch.addEventListener('input', function(){
@@ -1532,12 +1577,57 @@ function setupScrollSpy(selector){
   items.forEach(function(t){ obs.observe(t); });
 }
 
-document.querySelectorAll('.paper-tab').forEach(function(tab){
-  tab.addEventListener('click', function(){
-    document.querySelectorAll('.paper-tab').forEach(function(t){ t.setAttribute('aria-selected', 'false'); });
-    tab.setAttribute('aria-selected', 'true');
-    renderPaper(tab.dataset.paper);
+/* ===== DROPDOWN NAVIGATION ===== */
+/* Unified navigation: clicking a nav-item updates dropdown state + renders.
+   selectPaper() can be called from anywhere (search, plans cross-links, etc.)
+   and keeps both the dropdown trigger label and the active item in sync. */
+function selectPaper(paperId, opts){
+  document.querySelectorAll('.nav-item').forEach(function(it){
+    it.setAttribute('aria-selected', it.dataset.paper === paperId ? 'true' : 'false');
   });
+  /* Also keep .paper-tab queries working for legacy code that still uses them */
+  document.querySelectorAll('.paper-tab').forEach(function(t){
+    t.setAttribute('aria-selected', t.dataset.paper === paperId ? 'true' : 'false');
+  });
+  /* Update the dropdown trigger label/title */
+  const activeItem = document.querySelector('.nav-item[data-paper="' + paperId + '"]');
+  if (activeItem){
+    const numEl = activeItem.querySelector('.nav-item-num');
+    const titleEl = activeItem.querySelector('.nav-item-title');
+    if (numEl) document.getElementById('nav-trigger-label').textContent = numEl.textContent;
+    if (titleEl) document.getElementById('nav-trigger-title').innerHTML = titleEl.innerHTML;
+  }
+  closeNavMenu();
+  if (!opts || !opts.skipRender) renderPaper(paperId);
+}
+function openNavMenu(){
+  document.getElementById('nav-menu').hidden = false;
+  document.getElementById('nav-trigger').setAttribute('aria-expanded', 'true');
+}
+function closeNavMenu(){
+  document.getElementById('nav-menu').hidden = true;
+  document.getElementById('nav-trigger').setAttribute('aria-expanded', 'false');
+}
+document.getElementById('nav-trigger').addEventListener('click', function(e){
+  e.stopPropagation();
+  const trigger = document.getElementById('nav-trigger');
+  if (trigger.getAttribute('aria-expanded') === 'true') closeNavMenu();
+  else openNavMenu();
+});
+document.addEventListener('click', function(e){
+  const menu = document.getElementById('nav-menu');
+  const trigger = document.getElementById('nav-trigger');
+  if (menu.hidden) return;
+  if (menu.contains(e.target) || trigger.contains(e.target)) return;
+  closeNavMenu();
+});
+document.querySelectorAll('.nav-item').forEach(function(item){
+  item.addEventListener('click', function(){ selectPaper(item.dataset.paper); });
+});
+/* Keep the old paper-tab handler alive in case anything still listens.
+   (selectPaper handles new dropdown; this is no-op for buttons that no longer exist.) */
+document.querySelectorAll('.paper-tab').forEach(function(tab){
+  tab.addEventListener('click', function(){ selectPaper(tab.dataset.paper); });
 });
 
 let searchIndex = [];
@@ -1734,8 +1824,7 @@ document.addEventListener('keydown', function(e){
   else if (['1','2','3','4','5','6'].indexOf(e.key) >= 0){
     e.preventDefault();
     const paperId = '0' + e.key;
-    const tab = document.querySelector('.paper-tab[data-paper="' + paperId + '"]');
-    if (tab) tab.click();
+    selectPaper(paperId);
   }
   else if (e.key === 'j' || e.key === 'k'){
     const items = document.querySelectorAll('.topic, .craft-section, .ref-section');
