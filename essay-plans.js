@@ -1,6 +1,209 @@
+/* OCR H573 — Specification-named scholars per topic.
+   These are the scholars OCR explicitly names in the H573 specification (v1.6).
+   Examiners expect engagement with these for AO1 marks. Wider reading
+   (NICHE_SCHOLARS below) is for AO2 depth but does not substitute for spec
+   scholars. */
+const SPEC_SCHOLARS = {
+  "Ancient Philosophical Influences": [
+    { name:"Plato", work:"Republic VI-VII", position:"Theory of Forms; Cave Allegory; Form of the Good; reason as path to knowledge" },
+    { name:"Aristotle", work:"Physics, Metaphysics", position:"Four Causes (material, formal, efficient, final/telos); Prime Mover; empiricism" }
+  ],
+  "Soul, Mind and Body": [
+    { name:"Plato", work:"Phaedo", position:"Soul is immortal, immaterial substance separable from body" },
+    { name:"Aristotle", work:"De Anima", position:"Soul as form of the body (hylomorphism); not separable" },
+    { name:"Descartes", work:"Meditations", position:"Substance dualism — res cogitans vs res extensa; cogito" },
+    { name:"Ryle", work:"The Concept of Mind", position:"'Ghost in the machine' — category error; behavioural materialism" },
+    { name:"Dawkins", work:"The Selfish Gene; The God Delusion", position:"Materialism — soul as metaphor for brain processes" }
+  ],
+  "Arguments from Observation": [
+    { name:"Aquinas", work:"Summa Theologiae I.2", position:"Five Ways — motion, causation, contingency, gradation, teleology" },
+    { name:"Paley", work:"Natural Theology (1802)", position:"Watchmaker analogy — purposive arrangement implies designer" },
+    { name:"Hume", work:"Dialogues Concerning Natural Religion", position:"Critique of design analogy; problem of evil; epicurean hypothesis" },
+    { name:"Swinburne", work:"The Existence of God", position:"Cumulative case for design via fine-tuning of physical constants" },
+    { name:"Tennant", work:"Philosophical Theology", position:"Anthropic teleological argument; aesthetic argument" },
+    { name:"Darwin/Dawkins", work:"Origin of Species; The Blind Watchmaker", position:"Natural selection produces apparent design without designer" }
+  ],
+  "Arguments from Reason": [
+    { name:"Anselm", work:"Proslogion 2, Proslogion 3", position:"God as 'that than which nothing greater can be conceived'; necessary existence" },
+    { name:"Gaunilo", work:"In Behalf of the Fool", position:"Lost island reductio — Anselm's logic generalises absurdly" },
+    { name:"Descartes", work:"Meditation V", position:"Existence as perfection — God's essence includes existence" },
+    { name:"Kant", work:"Critique of Pure Reason", position:"Existence is not a predicate — destroys ontological argument" }
+  ],
+  "Religious Experience": [
+    { name:"William James", work:"The Varieties of Religious Experience", position:"Four marks of mystical experience: ineffable, noetic, transient, passive; pragmatic test of fruits" },
+    { name:"Otto", work:"The Idea of the Holy", position:"Numinous — mysterium tremendum et fascinans" },
+    { name:"Schleiermacher", work:"On Religion", position:"Religion as feeling of absolute dependence" },
+    { name:"Swinburne", work:"The Existence of God", position:"Principles of credulity and testimony — experience as defeasible evidence" },
+    { name:"Freud", work:"The Future of an Illusion", position:"Religious experience as wish-fulfilment, projection of father" },
+    { name:"Acts 9", work:"Saul on Damascus road", position:"Paradigm of conversion experience — sudden reorientation" }
+  ],
+  "Problem of Evil": [
+    { name:"Augustine", work:"Confessions; City of God", position:"Evil as privatio boni; Fall as origin; original sin; free-will theodicy" },
+    { name:"Irenaeus", work:"Against Heresies", position:"Soul-making — humans not perfect from start; growth through suffering" },
+    { name:"Hick", work:"Evil and the God of Love", position:"Modern Irenaean theodicy; epistemic distance; vale of soul-making; universalism" },
+    { name:"Plantinga", work:"God, Freedom and Evil", position:"Free-will defence — God cannot create free creatures who always choose good" },
+    { name:"Mackie", work:"Evil and Omnipotence", position:"Logical problem — inconsistent triad of omnipotence, omnibenevolence, evil" }
+  ],
+  "Nature of God": [
+    { name:"Anselm", work:"Proslogion", position:"God as supremely perfect — eternal, omnipotent, omniscient" },
+    { name:"Aquinas", work:"Summa Theologiae I.3-26", position:"Divine simplicity, eternity, omnipotence, omniscience; doctrine of analogy applied" },
+    { name:"Boethius", work:"Consolation of Philosophy V", position:"Eternity as 'complete possession all at once of illimitable life' — atemporal" },
+    { name:"Swinburne", work:"The Coherence of Theism", position:"God as everlasting (in time); voluntarily limits foreknowledge of free actions" }
+  ],
+  "Religious Language (Negative/Analogical/Symbolic)": [
+    { name:"Pseudo-Dionysius", work:"Mystical Theology", position:"Via negativa — only negations preserve God's transcendence" },
+    { name:"Maimonides", work:"Guide for the Perplexed", position:"All positive divine attributes must be translated into negations" },
+    { name:"Aquinas", work:"Summa Theologiae I.13", position:"Analogy of attribution and analogy of proper proportion — middle way between univocity and equivocation" },
+    { name:"Tillich", work:"Dynamics of Faith", position:"Religious language as symbol — participates in what it signifies; 'God is being-itself'" }
+  ],
+  "Religious Language (20th Century)": [
+    { name:"Ayer", work:"Language, Truth and Logic", position:"Verification principle — religious statements meaningless because unverifiable" },
+    { name:"Vienna Circle", work:"Logical positivism", position:"Only analytic or empirically verifiable statements are meaningful" },
+    { name:"Flew", work:"'Theology and Falsification'", position:"Gardener parable — death by a thousand qualifications; religious claims unfalsifiable" },
+    { name:"Hare", work:"'Theology and Falsification' reply", position:"Bliks — unfalsifiable but meaningful frameworks (lunatic don example)" },
+    { name:"Mitchell", work:"'Theology and Falsification' reply", position:"Partisan parable — faith qualified by but not surrendered to evidence" },
+    { name:"Wittgenstein", work:"Philosophical Investigations", position:"Meaning is use — religious language as language game with own grammar" },
+    { name:"Hick", work:"'Theology and Verification'", position:"Eschatological verification — religious claims testable post-mortem" }
+  ],
+  "Natural Law": [
+    { name:"Aquinas", work:"Summa Theologiae I-II.90-97", position:"Four tiers: eternal, divine, natural, human law; five primary precepts; secondary precepts derived by reason; doctrine of double effect" },
+    { name:"Aristotle", work:"Nicomachean Ethics", position:"Telos (final cause); virtue ethics; foundation Aquinas builds on" },
+    { name:"Hoose", work:"Proportionalism", position:"Primary precepts absolute; secondary precepts revisable when proportionate reason exists" },
+    { name:"Vardy", work:"The Puzzle of Ethics", position:"Modern commentator and exposition of natural law principles" },
+    { name:"Catholic Church", work:"Humanae Vitae (1968)", position:"Application of natural law to contraception and sexual ethics" }
+  ],
+  "Situation Ethics": [
+    { name:"Fletcher", work:"Situation Ethics: The New Morality (1966)", position:"Six fundamental principles; four working principles (pragmatism, relativism, positivism, personalism); agape as sole absolute" },
+    { name:"Robinson", work:"Honest to God (1963)", position:"Situationist Anglican bishop — supported Fletcher's approach" },
+    { name:"Barclay", work:"Ethics in a Permissive Society", position:"Critique — fine for saints, dangerous for sinners" },
+    { name:"Mark 2:27", work:"'The Sabbath was made for man'", position:"Biblical basis Fletcher cites — rules serve persons, not vice versa" },
+    { name:"1 Corinthians 13", work:"Pauline hymn to love", position:"Biblical content of agape — patient, kind, etc." }
+  ],
+  "Kantian Ethics": [
+    { name:"Kant", work:"Groundwork of the Metaphysics of Morals; Critique of Practical Reason", position:"Good will; duty; categorical imperative (universalisation, humanity, kingdom of ends); three postulates (freedom, immortality, God); summum bonum" }
+  ],
+  "Utilitarianism": [
+    { name:"Bentham", work:"Introduction to the Principles of Morals and Legislation", position:"Act utilitarianism; hedonic calculus (intensity, duration, certainty, propinquity, fecundity, purity, extent); all pleasures equal in kind" },
+    { name:"Mill", work:"Utilitarianism; On Liberty", position:"Higher and lower pleasures; rule utilitarianism; harm principle" },
+    { name:"Singer", work:"Practical Ethics; Animal Liberation", position:"Preference utilitarianism — maximise satisfaction of preferences; extends to animals" }
+  ],
+  "Euthanasia": [
+    { name:"Singer", work:"Rethinking Life and Death", position:"Sanctity of life is incoherent post-brain-death; preference utilitarian case for voluntary euthanasia" },
+    { name:"Glover", work:"Causing Death and Saving Lives", position:"Careful utilitarian defence of voluntary euthanasia" },
+    { name:"Rachels", work:"'Active and Passive Euthanasia'", position:"No moral difference between killing and letting die" },
+    { name:"Aquinas/Catholic", work:"Doctrine of Double Effect", position:"Foreseen-but-unintended consequences in pain relief — permits palliation that may shorten life" }
+  ],
+  "Business Ethics": [
+    { name:"Friedman", work:"NYT 1970 article", position:"The social responsibility of business is to increase its profits" },
+    { name:"Stakeholder theory", work:"Freeman, Strategic Management", position:"Businesses have responsibilities to all stakeholders, not only shareholders" },
+    { name:"Kant/Utilitarianism/Natural Law/Situation Ethics", work:"applied", position:"Apply each theory to whistleblowing, globalisation, CSR — examiners expect this" }
+  ],
+  "Meta-ethics": [
+    { name:"Naturalism: Aquinas, Bentham, Mill", work:"applied", position:"Moral properties are natural properties (good = fulfilling telos, maximising pleasure, etc.)" },
+    { name:"Bradley", work:"Ethical Studies", position:"Naturalist — moral self-realisation through social station and duties" },
+    { name:"Moore", work:"Principia Ethica (1903)", position:"Intuitionism — 'good' is simple, non-natural, indefinable; naturalistic fallacy; open question argument" },
+    { name:"Prichard", work:"'Does Moral Philosophy Rest on a Mistake?'", position:"Intuitionism — moral obligations are sui generis and self-evident" },
+    { name:"Ross", work:"The Right and the Good", position:"Intuitionism — seven prima facie duties (fidelity, reparation, gratitude, justice, beneficence, self-improvement, non-maleficence)" },
+    { name:"Ayer", work:"Language, Truth and Logic", position:"Emotivism — moral statements express attitudes, not truth-apt" },
+    { name:"Stevenson", work:"Ethics and Language", position:"Emotivism refined — moral statements have descriptive and dynamic (persuasive) meaning" },
+    { name:"Hume", work:"A Treatise of Human Nature", position:"Is-ought gap; moral reasoning grounded in sentiment, not reason" }
+  ],
+  "Conscience": [
+    { name:"Aquinas", work:"Summa Theologiae I.79; I-II.19", position:"Synderesis (innate disposition to good, infallible); conscientia (application, fallible); vincible vs invincible ignorance" },
+    { name:"Augustine", work:"Confessions", position:"Conscience as inward voice of God's law; pre-Aquinas Christian tradition" },
+    { name:"Butler", work:"Fifteen Sermons", position:"Conscience as superintendent faculty distinguishing self-love from benevolence" },
+    { name:"Newman", work:"A Letter to the Duke of Norfolk", position:"Conscience as 'aboriginal Vicar of Christ' — voice of God in soul" },
+    { name:"Freud", work:"The Ego and the Id; Civilization and its Discontents", position:"Super-ego — internalised parental and social prohibitions; origin of guilt" },
+    { name:"Fromm", work:"Man for Himself", position:"Authoritarian (Freudian) vs humanistic conscience" },
+    { name:"Piaget/Kohlberg", work:"Stages of moral development", position:"Conscience as developmental — pre-conventional, conventional, post-conventional" }
+  ],
+  "Sexual Ethics": [
+    { name:"Natural Law", work:"applied", position:"Aquinas/Catholic — sex's telos is procreative-unitive within heterosexual marriage" },
+    { name:"Situation Ethics", work:"Fletcher applied", position:"What love (agape) demands in the situation; no universal prohibitions" },
+    { name:"Kantian Ethics", work:"Kant applied", position:"Treat persons as ends not means; consent and dignity central" },
+    { name:"Utilitarianism", work:"Bentham/Mill/Singer applied", position:"Maximise welfare; Mill's harm principle limits state regulation" },
+    { name:"Humanae Vitae", work:"Paul VI (1968)", position:"Catholic teaching on contraception, marriage, sex" }
+  ],
+  "Augustine on Human Nature": [
+    { name:"Augustine", work:"Confessions; City of God XIV; On the Trinity", position:"Pre-Fall relationships; original sin transmitted biologically; concupiscence; incurvatus in se; grace and predestination; summum bonum as union with God" },
+    { name:"Pelagius", work:"Letter to Demetrias", position:"Opponent — humans can choose good without grace; original sin denied. Condemned at Carthage 418" },
+    { name:"Genesis 3", work:"the Fall narrative", position:"Biblical text Augustine treats as historical foundation" },
+    { name:"Romans 5:12", work:"Pauline text", position:"'Through one man sin entered the world' — Augustine's biblical anchor for original sin" }
+  ],
+  "Death and Afterlife": [
+    { name:"Hick", work:"Death and Eternal Life", position:"Pluralist universalism; soul-making continues post-mortem; epistemic distance" },
+    { name:"Matthew 25", work:"Sheep and Goats parable", position:"Ethical criterion for final judgement — treatment of 'the least of these'" },
+    { name:"Limited election", work:"Calvin, Westminster Confession", position:"Predestinarian view — God elects some, passes over others" },
+    { name:"Unlimited election", work:"Arminius, modern Catholic teaching", position:"Salvation offered to all; humans freely accept or reject" },
+    { name:"Universalism", work:"Origen, Hick", position:"All souls eventually reach God; eternal punishment incompatible with divine love" },
+    { name:"1 Corinthians 15", work:"Pauline resurrection text", position:"Bodily resurrection as the Christian hope, not Platonic soul-immortality" }
+  ],
+  "Knowledge of God": [
+    { name:"Aquinas", work:"Summa Theologiae I.2", position:"Natural theology — God's existence demonstrable from order of creation; Romans 1:20 affirmed" },
+    { name:"Calvin", work:"Institutes I.3-5", position:"Sensus divinitatis — innate awareness of God; corrupted but not destroyed by Fall" },
+    { name:"Barth", work:"Church Dogmatics", position:"Rejects natural theology absolutely; revelation in Christ is the only knowledge of God ('Nein!' to Brunner)" },
+    { name:"Brunner", work:"Nature and Grace", position:"Modest natural theology — 'point of contact' (Anknüpfungspunkt) in human nature for revelation" },
+    { name:"Romans 1:18-20", work:"Pauline text", position:"'God's invisible attributes... clearly seen' from creation — biblical basis for natural theology" },
+    { name:"John 14:9", work:"Jesus saying", position:"'He who has seen me has seen the Father' — Christ as revelation" }
+  ],
+  "Person of Jesus Christ": [
+    { name:"Son of God", work:"John 14:9; Mark 14:62", position:"Knowledge of God uniquely revealed; 'Abba' intimacy; miracles; resurrection" },
+    { name:"Teacher of wisdom", work:"Luke 15:11-32 (Prodigal Son); Matthew 5-7 (Sermon on the Mount)", position:"Repentance and forgiveness; inner purity and moral motivation" },
+    { name:"Liberator", work:"Luke 4:18; Luke 10:25-37 (Good Samaritan); Mark 11 (Temple cleansing)", position:"Challenge to religious and political authority; preferential option for poor" },
+    { name:"Bonhoeffer", work:"The Cost of Discipleship", position:"Christ as exemplar of costly grace; 'Christ existing as community'" }
+  ],
+  "Christian Moral Principles": [
+    { name:"Bible alone", work:"sola scriptura position", position:"Scripture is sufficient, clear, final authority for Christian ethics" },
+    { name:"Bible + Church + reason", work:"Catholic position", position:"Scripture authoritative but requires interpretation; magisterium and natural law also authoritative" },
+    { name:"Agape", work:"Fletcher's situation ethics; 1 Corinthians 13; Mark 12:29-31", position:"Love as sole moral principle; rules subordinate" },
+    { name:"Bonhoeffer", work:"Ethics", position:"Christ-centred ethics; concrete responsibility; cheap vs costly grace" }
+  ],
+  "Bonhoeffer": [
+    { name:"Bonhoeffer", work:"The Cost of Discipleship; Ethics; Life Together; Letters and Papers from Prison", position:"Costly grace vs cheap grace; duty to God and State (Romans 13 conditional); Confessing Church and Barmen; Finkenwalde community; civil disobedience; solidarity, sacrifice, responsibility" },
+    { name:"Barmen Declaration", work:"1934", position:"Confessing Church manifesto Bonhoeffer co-authored — rejects any sphere of life independent of Christ" },
+    { name:"Niebuhr", work:"American friend", position:"Shared concern with Christian realism in politics" }
+  ],
+  "Religious Pluralism (Theology)": [
+    { name:"Exclusivism", work:"Cyprian, Barth", position:"'Extra ecclesiam nulla salus' — only Christianity saves; John 14:6, Acts 4:12" },
+    { name:"Inclusivism", work:"Rahner, Vatican II (Nostra Aetate)", position:"Anonymous Christians — non-Christians can be saved through Christ implicitly" },
+    { name:"Pluralism", work:"Hick (An Interpretation of Religion); D'Costa", position:"All major religions are equally valid responses to the same Real; Copernican revolution" },
+    { name:"John 14:6", work:"Jesus' saying", position:"'No one comes to the Father except through me' — exclusivist proof-text" },
+    { name:"Vatican II Nostra Aetate", work:"1965", position:"Catholic inclusivist statement — 'the Church rejects nothing that is true and holy in these religions'" }
+  ],
+  "Religious Pluralism (Society)": [
+    { name:"Redemptoris Missio", work:"John Paul II (1990)", position:"Catholic teaching — Christ as sole saviour, but Holy Spirit works in all religions; mission in dialogue" },
+    { name:"Sharing the Gospel of Salvation", work:"Church of England (1995)", position:"Anglican position holding Christ's uniqueness with respectful dialogue" },
+    { name:"Inter-faith dialogue", work:"types of dialogue", position:"Dialogue of life, action, theological exchange, religious experience" },
+    { name:"Scriptural Reasoning", work:"Ochs, Ford", position:"Jews, Christians, Muslims study each other's scriptures while remaining committed to own tradition" }
+  ],
+  "Gender and Society": [
+    { name:"de Beauvoir", work:"The Second Sex (1949)", position:"'One is not born, but rather becomes, a woman' — foundational text of modern feminism" },
+    { name:"Ephesians 5:22-33", work:"Pauline text", position:"'Wives submit to your husbands' — traditional complementarian text" },
+    { name:"1 Timothy 2:11-15", work:"Pauline text", position:"Women should learn in silence — restrictive interpretation contested" },
+    { name:"Mulieris Dignitatem", work:"John Paul II (1988)", position:"Apostolic letter on women's dignity; complementarity; 'feminine genius'; defends male-only priesthood" }
+  ],
+  "Gender and Theology": [
+    { name:"Ruether", work:"Sexism and God-Talk (1983)", position:"Reform position — Christianity contains feminist resources; Christ's maleness historically contingent" },
+    { name:"Daly", work:"Beyond God the Father (1973); Gyn/Ecology (1978)", position:"'If God is male, then the male is God'; post-Christian rejection; goddess spirituality" },
+    { name:"Wisdom literature", work:"Proverbs 8 (Sophia)", position:"Biblical feminine personification of divine Wisdom — basis for feminine God-language" },
+    { name:"Trible", work:"God and the Rhetoric of Sexuality; Texts of Terror", position:"Feminist biblical criticism — depatriarchalising reading" }
+  ],
+  "Secularism": [
+    { name:"Freud", work:"The Future of an Illusion (1927); Civilization and Its Discontents (1930)", position:"Religion as illusion — wish-fulfilment, projection of father, collective neurosis; humanity will outgrow religion" },
+    { name:"Dawkins", work:"The God Delusion (2006); The Selfish Gene", position:"Religion as harmful delusion; evolutionary by-product; causes violence, obstructs science" },
+    { name:"Secular humanism", work:"Humanists UK; Sam Harris; Hitchens", position:"Morality, meaning, community without supernatural belief; faith schools, House of Lords, establishment all opposed" }
+  ],
+  "Liberation Theology and Marx": [
+    { name:"Marx", work:"Communist Manifesto; Capital", position:"Alienation (from product, process, species-being, others); exploitation (surplus value extracted by capital); religion as 'opium of the people'" },
+    { name:"Gutiérrez", work:"A Theology of Liberation (1971)", position:"Founding text — preferential option for the poor; structural sin; orthopraxis over orthodoxy" },
+    { name:"Boff", work:"Jesus Christ Liberator; Church: Charism and Power", position:"Latin American liberation theology; orthopraxis emphasised" },
+    { name:"Pope Francis", work:"Evangelii Gaudium (2013)", position:"Rehabilitation of liberation themes; preferential option for poor now mainstream Catholic teaching" }
+  ]
+};
+
 /* OCR H573 — Niche / advanced scholar references, organised by topic.
-   Each plan in ESSAY_PLANS is rendered with the relevant niche scholars
-   appended, giving students a wider range of named thinkers to deploy. */
+   These are NOT on the specification — useful for AO2 wider reading but
+   do not substitute for engagement with spec scholars above. */
 const NICHE_SCHOLARS = {
   "Ancient Philosophical Influences": [
     {name:"Iris Murdoch",area:"Plato",position:"Reads Plato's Good as moral psychology — 'unselfing' attention; Sovereignty of Good"},

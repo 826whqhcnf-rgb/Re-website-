@@ -175,7 +175,7 @@ function renderPlans(){
     '<div class="paper-intro"><div class="eyebrow" style="color:var(--gold)">Essay plans &middot; OCR H573</div>' +
     '<h1>Essay <em style="color:var(--gold)">Plans</em></h1>' +
     '<p class="lede">Model essay plans for the major H573 exam questions. Each plan shows the committed thesis, paragraph-by-paragraph structure with scholars, counter-arguments and responses, and the verdict. Where a plan is marked with a grade, it is calibrated against a real examiner mark.</p></div>' +
-    '<div class="plans-intro">Each plan is a skeleton, not a finished essay. Use them to learn the <strong>architecture</strong> of a strong response: thesis upfront, scholars deployed argumentatively (not just named), dialectical structure (claim → counter → response), and a conclusion that commits.</div>' +
+    '<div class="plans-intro">Each plan is a skeleton, not a finished essay. Use them to learn the <strong>architecture</strong> of a strong response: thesis upfront, scholars deployed argumentatively (not just named), dialectical structure (claim → counter → response), and a conclusion that commits.<br><br><strong style="color:var(--claret);font-style:normal">★ Spec scholars (claret box):</strong> the thinkers OCR explicitly names in the H573 specification. Examiners expect engagement with these for AO1 marks — they are not optional. <strong style="color:var(--ochre);font-style:normal">Wider scholarship (ochre box):</strong> impressive for AO2 depth but does not substitute for spec scholars.</div>' +
     '<div class="plans-filter" id="plans-filter">' +
       '<button data-pf="all" class="active">All ' + ESSAY_PLANS.length + '</button>' +
       '<button data-pf="01">Paper 01 (' + ESSAY_PLANS.filter(function(p){return p.paper==="01";}).length + ')</button>' +
@@ -263,10 +263,19 @@ function renderSinglePlan(plan){
   if (plan.examinerNotes){
     html += '<div class="plan-examiner"><span class="plan-examiner-label">Examiner notes</span>' + plan.examinerNotes + '</div>';
   }
+  /* Specification-named scholars for this topic (CRITICAL for marks) */
+  if (typeof SPEC_SCHOLARS !== 'undefined' && SPEC_SCHOLARS[plan.topic]){
+    const spec = SPEC_SCHOLARS[plan.topic];
+    html += '<div class="plan-spec"><span class="plan-spec-label">★ Specification scholars <small>— examiners expect these for AO1 marks</small></span>';
+    spec.forEach(function(s){
+      html += '<div class="plan-spec-item"><strong>' + s.name + '</strong>' + (s.work ? ' <em>' + s.work + '</em>' : '') + ' — ' + s.position + '</div>';
+    });
+    html += '</div>';
+  }
   /* Niche scholars for the topic */
   if (typeof NICHE_SCHOLARS !== 'undefined' && NICHE_SCHOLARS[plan.topic]){
     const niche = NICHE_SCHOLARS[plan.topic];
-    html += '<div class="plan-niche"><span class="plan-niche-label">Wider scholarship for this topic</span>';
+    html += '<div class="plan-niche"><span class="plan-niche-label">Wider scholarship <small>— for AO2 depth, not a substitute for spec scholars</small></span>';
     niche.forEach(function(s){
       html += '<div class="plan-niche-item"><strong>' + s.name + '</strong>' + (s.area ? ' <em>(' + s.area + ')</em>' : '') + ' — ' + s.position + '</div>';
     });
