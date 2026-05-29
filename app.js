@@ -254,6 +254,7 @@ function renderPlans(){
     list.innerHTML = filtered.length ?
       filtered.map(renderSinglePlan).join('') :
       '<div style="padding:2.5rem;text-align:center;color:var(--muted);font-style:italic;background:var(--wash);border:1px dashed var(--rule)">No plans match these filters.</div>';
+    wirePlanLinks();
   }
   const paperSelect = document.getElementById('plans-paper-select');
   const topicSelect = document.getElementById('plans-topic-select');
@@ -277,13 +278,47 @@ function renderPlans(){
     });
   }
 
+  wirePlanLinks();
   window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function wirePlanLinks(){
+  document.querySelectorAll('.plan-topic-jump').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      const targetPaper = a.dataset.paper;
+      const targetTopic = a.dataset.topic;
+      if (!targetPaper) return;
+      selectPaper(targetPaper);
+      setTimeout(function(){
+        const el = document.getElementById(targetTopic);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    });
+  });
 }
 
 function renderSinglePlan(plan){
   const hasMarks = !!plan.examMarks;
+  /* Try to find the topic in CONTENT for a deep link to the notes */
+  let topicLinkPaper = null, topicLinkId = null;
+  if (typeof CONTENT !== 'undefined'){
+    ['01','02','03'].forEach(function(p){
+      (CONTENT[p].topics || []).forEach(function(t){
+        const planTopicKey = plan.topic.toLowerCase();
+        const tTitle = stripHtml(t.title).toLowerCase();
+        if (!topicLinkPaper && (planTopicKey.indexOf(tTitle) >= 0 || tTitle.indexOf(planTopicKey) >= 0 ||
+            planTopicKey.split(' ').filter(function(w){ return w.length > 3; }).some(function(w){ return tTitle.indexOf(w) >= 0; }))){
+          topicLinkPaper = p; topicLinkId = t.id;
+        }
+      });
+    });
+  }
+  const topicLink = topicLinkPaper ?
+    '<a href="#" class="plan-topic-jump" data-paper="' + topicLinkPaper + '" data-topic="' + topicLinkId + '">' + plan.topic + ' →</a>' :
+    plan.topic;
   let html = '<article class="plan-section ' + (hasMarks ? 'exemplar' : '') + '" id="plan-' + plan.id + '">' +
-    '<div class="plan-meta">Paper ' + plan.paper + ' &middot; ' + plan.topic + '</div>' +
+    '<div class="plan-meta">Paper ' + plan.paper + ' &middot; ' + topicLink + '</div>' +
     '<div class="plan-q">' + plan.question + '</div>';
   if (hasMarks){
     html += '<div class="plan-marks">' + plan.examMarks + '</div>';
@@ -1458,9 +1493,29 @@ function drawRubric(d, m){
   if (d.identifiedTopic && (d.missingRequiredScholars.length || d.missingRequiredConcepts.length)){
     const topicName = CONTENT['01'].topics.concat(CONTENT['02'].topics, CONTENT['03'].topics).find(function(t){ return t.id === d.identifiedTopic; });
     const topicTitle = topicName ? stripHtml(topicName.title) : d.identifiedTopic;
-    html += '<div class="detected-list"><div class="detected-list-label" style="color:var(--ochre)">Topic detected: ' + topicTitle + '</div>';
+    /* Find which paper this topic is in for the jump-to-topic link */
+    let topicPaper = null;
+    ['01','02','03'].forEach(function(p){
+      if (CONTENT[p].topics && CONTENT[p].topics.some(function(t){ return t.id === d.identifiedTopic; })) topicPaper = p;
+    });
+    html += '<div class="detected-list"><div class="detected-list-label" style="color:var(--ochre)">Topic detected: <a href="#" class="marker-jump-topic" data-paper="' + topicPaper + '" data-topic="' + d.identifiedTopic + '" style="color:var(--claret);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">' + topicTitle + ' →</a></div>';
+    /* Find a plan for this topic */
+    const matchingPlan = (typeof ESSAY_PLANS !== 'undefined') ? ESSAY_PLANS.find(function(plan){
+      return plan.topic && topicName && plan.topic.toLowerCase().indexOf(stripHtml(topicName.title).toLowerCase().replace(/<[^>]+>/g, '').replace(/[^a-z]/g, ' ').trim().split(' ')[0]) >= 0;
+    }) : null;
+    if (matchingPlan){
+      html += '<div style="font-size:0.78rem;color:var(--muted);margin:0.3rem 0;font-style:italic">' +
+        '<a href="#" class="marker-jump-plan" data-plan-id="' + matchingPlan.id + '" style="color:var(--ochre);text-decoration:underline;text-decoration-style:dotted">→ Open the model plan for this topic</a>' +
+        '</div>';
+    }
     if (d.missingRequiredScholars.length){
-      html += '<div style="font-size:0.82rem;color:var(--ink);margin:0.3rem 0"><strong style="color:var(--claret)">Missing core scholars:</strong> ' + d.missingRequiredScholars.join(', ') + '. An L5+ essay on this topic should engage with these.</div>';
+      const linkedScholars = d.missingRequiredScholars.map(function(s){
+        const key = canonicalScholarKey(s);
+        const inIndex = typeof SCHOLAR_INDEX !== 'undefined' && SCHOLAR_INDEX[key];
+        if (inIndex) return '<a href="#" class="marker-jump-scholar" data-key="' + key + '" style="color:var(--claret);font-weight:600;text-decoration:underline;text-decoration-style:dotted">' + s + '</a>';
+        return '<strong>' + s + '</strong>';
+      }).join(', ');
+      html += '<div style="font-size:0.82rem;color:var(--ink);margin:0.3rem 0"><strong style="color:var(--claret)">Missing core scholars:</strong> ' + linkedScholars + '. <span style="color:var(--muted);font-style:italic">Click a name to see where it is discussed.</span></div>';
     }
     if (d.missingRequiredConcepts.length){
       html += '<div style="font-size:0.82rem;color:var(--ink);margin:0.3rem 0"><strong style="color:var(--claret)">Missing core concepts:</strong> ' + d.missingRequiredConcepts.join(', ') + '.</div>';
@@ -1495,6 +1550,38 @@ function drawRubric(d, m){
       if (ao === 'ao1'){ MARKER_STATE.ao1Level = L; MARKER_STATE.ao1Pos = null; }
       else { MARKER_STATE.ao2Level = L; MARKER_STATE.ao2Pos = null; }
       drawRubric(d, computeMarks(d));
+    });
+  });
+  /* Wire jump-to-topic, jump-to-scholar, jump-to-plan from marker feedback */
+  rubric.querySelectorAll('.marker-jump-topic').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      const targetPaper = a.dataset.paper;
+      const targetTopic = a.dataset.topic;
+      if (!targetPaper) return;
+      selectPaper(targetPaper);
+      setTimeout(function(){
+        const el = document.getElementById(targetTopic);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    });
+  });
+  rubric.querySelectorAll('.marker-jump-scholar').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      const key = a.dataset.key;
+      if (key && typeof openScholar === 'function') openScholar(key);
+    });
+  });
+  rubric.querySelectorAll('.marker-jump-plan').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      const planId = a.dataset.planId;
+      selectPaper('08');
+      setTimeout(function(){
+        const el = document.getElementById('plan-' + planId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
     });
   });
   /* Wire save */
