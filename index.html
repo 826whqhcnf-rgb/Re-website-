@@ -737,9 +737,73 @@ body.dark .gizmo-type-feedback.wrong{background:rgba(168,50,50,0.18);color:#f1c5
 /* 3-button deck actions stay readable */
 .gizmo-deck-actions{flex-wrap:wrap}
 .gizmo-deck-actions button{flex:1 1 70px}
+
+/* ─── POLISH PASS ──────────────────────────────────────────────── */
+/* Reading progress bar (top of viewport) */
+.read-progress{position:fixed;top:0;left:0;right:0;height:3px;background:transparent;z-index:50;pointer-events:none}
+.read-progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--claret),var(--ochre),var(--gold));transition:width 0.12s linear;box-shadow:0 0 8px rgba(196,137,47,0.5)}
+
+/* Smoother focus rings (accessibility + polish) */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--ochre);outline-offset:2px;border-radius:2px}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+
+/* Subtle hover lift on interactive cards */
+.synoptic-card,.t-action,.tool-btn,.filter-pill{transition:transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease}
+.synoptic-card:hover{transform:translateX(2px)}
+.t-action:hover,.tool-btn:hover{transform:translateY(-1px)}
+
+/* Floating action button (bottom-right tools launcher) */
+.fab-wrap{position:fixed;right:1.4rem;bottom:1.4rem;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:0.5rem;pointer-events:none}
+.fab-wrap > *{pointer-events:auto}
+.fab-main{width:54px;height:54px;border-radius:50%;background:var(--claret);color:var(--paper);border:none;font-family:var(--display);font-size:1.6rem;font-style:italic;font-weight:600;cursor:pointer;box-shadow:0 10px 26px -6px rgba(74,19,19,0.55),0 4px 12px -3px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;transition:transform 0.18s cubic-bezier(0.2,0.8,0.4,1.2),background 0.15s}
+.fab-main:hover{background:var(--claret-deep);transform:scale(1.05)}
+.fab-main[aria-expanded="true"]{transform:rotate(45deg);background:var(--ink)}
+.fab-menu{display:flex;flex-direction:column;gap:0.4rem;align-items:flex-end;opacity:0;transform:translateY(8px) scale(0.95);transform-origin:bottom right;transition:opacity 0.18s ease, transform 0.18s cubic-bezier(0.2,0.8,0.4,1);pointer-events:none}
+.fab-menu.open{opacity:1;transform:none;pointer-events:auto}
+.fab-item{display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.95rem 0.55rem 0.7rem;background:var(--paper);border:1px solid var(--rule-strong);border-radius:99px;cursor:pointer;font-family:var(--ui);font-size:0.78rem;font-weight:500;color:var(--ink);box-shadow:0 6px 18px -6px rgba(0,0,0,0.3);white-space:nowrap}
+.fab-item:hover{background:var(--paper-deep);border-color:var(--claret);color:var(--claret)}
+.fab-item .fab-ico{font-family:var(--display);font-style:italic;color:var(--claret);font-weight:600;width:1.2rem;text-align:center;font-size:1rem}
+
+/* Back-to-top button */
+.back-top{position:fixed;right:1.4rem;bottom:5.8rem;z-index:55;width:44px;height:44px;border-radius:50%;background:var(--wash);border:1px solid var(--rule-strong);color:var(--claret);font-family:var(--display);font-size:1.4rem;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 6px 18px -6px rgba(0,0,0,0.25);transition:all 0.15s;line-height:1}
+.back-top.show{display:flex}
+.back-top:hover{background:var(--paper);border-color:var(--claret);transform:translateY(-2px);color:var(--claret-deep)}
+
+@media (max-width:680px){
+  .fab-wrap{right:1rem;bottom:1rem}
+  .back-top{right:1rem;bottom:5.2rem;width:40px;height:40px}
+  .fab-main{width:48px;height:48px;font-size:1.4rem}
+  .fab-item{font-size:0.72rem;padding:0.45rem 0.8rem 0.45rem 0.6rem}
+}
+
+/* Tighter masthead + cleaner sub */
+.masthead{padding:1.3rem 2rem 1rem}
+.brand-sub{margin-top:0.35rem;font-size:0.95rem;line-height:1.4}
+.masthead-actions button{transition:all 0.15s}
+.masthead-actions button:hover{transform:translateY(-1px)}
+
+/* Topic-header subtle hover so cards feel alive */
+.topic{transition:background 0.2s}
+.topic:hover .topic-num{color:var(--claret-deep)}
+
+/* Better link affordance for in-note scholar mentions */
+.scholar-link,.scholar-ref{cursor:pointer;border-bottom:1px dotted rgba(107,29,29,0.45);transition:border-color 0.12s, color 0.12s}
+.scholar-link:hover,.scholar-ref:hover{border-bottom-color:var(--claret);color:var(--claret)}
+
+/* Dark-mode polish */
+body.dark .fab-item{background:#1f1a18;color:var(--paper);border-color:rgba(245,239,227,0.18)}
+body.dark .fab-item:hover{background:#2a201d;color:var(--gold);border-color:var(--gold)}
+body.dark .back-top{background:#1f1a18;border-color:rgba(245,239,227,0.2);color:var(--gold)}
+body.dark .back-top:hover{background:#2a201d;border-color:var(--gold);color:var(--gold)}
+
+/* Hide FAB and back-top in print */
+@media print{.fab-wrap,.back-top,.read-progress{display:none !important}}
 </style>
 </head>
 <body>
+
+<div class="read-progress" aria-hidden="true"><div class="read-progress-fill" id="read-progress-fill"></div></div>
 
 <header class="masthead">
   <div class="masthead-inner">
@@ -920,6 +984,21 @@ body.dark .gizmo-type-feedback.wrong{background:rgba(168,50,50,0.18);color:#f1c5
 
 <div class="toast-container" id="toast-container"></div>
 
+<button class="back-top" id="back-top" aria-label="Back to top" title="Back to top">↑</button>
+
+<div class="fab-wrap" aria-label="Quick tools">
+  <div class="fab-menu" id="fab-menu" role="menu">
+    <button class="fab-item" data-fab="search" role="menuitem"><span class="fab-ico">⌕</span>Search</button>
+    <button class="fab-item" data-fab="random" role="menuitem"><span class="fab-ico">⚂</span>Random topic</button>
+    <button class="fab-item" data-fab="flashcards" role="menuitem"><span class="fab-ico">♦</span>Quote flashcards</button>
+    <button class="fab-item" data-fab="essay-gen" role="menuitem"><span class="fab-ico">✎</span>Essay question</button>
+    <button class="fab-item" data-fab="timed" role="menuitem"><span class="fab-ico">◷</span>Timed essay</button>
+    <button class="fab-item" data-fab="quiz" role="menuitem"><span class="fab-ico">?</span>Scholar quiz</button>
+    <button class="fab-item" data-fab="past-papers" role="menuitem"><span class="fab-ico">§</span>Past papers</button>
+  </div>
+  <button class="fab-main" id="fab-main" aria-label="Quick tools" aria-haspopup="true" aria-expanded="false" title="Quick tools (press T)">+</button>
+</div>
+
 <footer>
   <p><b>OCR H573</b> &middot; 30 topics &middot; click any scholar to see all their appearances &middot; tick off as you go &middot; OCR-aligned essay marker</p>
   <p style="margin-top:0.4rem">Shortcuts: <kbd>/</kbd> search &middot; <kbd>1</kbd>-<kbd>6</kbd> tabs &middot; <kbd>j</kbd>/<kbd>k</kbd> next/prev topic &middot; <kbd>h</kbd> tick current topic studied</p>
@@ -948,13 +1027,13 @@ body.dark .gizmo-type-feedback.wrong{background:rgba(168,50,50,0.18);color:#f1c5
   </div>
 </div>
 
-<script src="content.js?v=12"></script>
-<script src="content-p2.js?v=12"></script>
-<script src="content-p3.js?v=12"></script>
-<script src="extras.js?v=12"></script>
-<script src="past-papers.js?v=12"></script>
-<script src="essay-plans.js?v=12"></script>
-<script src="app.js?v=12"></script>
-<script src="gizmo.js?v=12"></script>
+<script src="content.js?v=13"></script>
+<script src="content-p2.js?v=13"></script>
+<script src="content-p3.js?v=13"></script>
+<script src="extras.js?v=13"></script>
+<script src="past-papers.js?v=13"></script>
+<script src="essay-plans.js?v=13"></script>
+<script src="app.js?v=13"></script>
+<script src="gizmo.js?v=13"></script>
 </body>
 </html>

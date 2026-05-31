@@ -2377,3 +2377,90 @@ buildQuizBank();
 renderPaper('01');
 applyFilter();
 updateStreakDisplay();
+
+/* ─── Reading progress bar ─────────────────────────────── */
+(function(){
+  const fill = document.getElementById('read-progress-fill');
+  if (!fill) return;
+  let raf = 0;
+  function update(){
+    raf = 0;
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    const pct = max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0;
+    fill.style.width = pct.toFixed(1) + '%';
+  }
+  window.addEventListener('scroll', function(){
+    if (!raf) raf = requestAnimationFrame(update);
+  }, { passive: true });
+  window.addEventListener('resize', function(){
+    if (!raf) raf = requestAnimationFrame(update);
+  });
+  update();
+})();
+
+/* ─── Back-to-top button ─────────────────────────────── */
+(function(){
+  const btn = document.getElementById('back-top');
+  if (!btn) return;
+  let raf = 0;
+  function update(){
+    raf = 0;
+    if (window.scrollY > 600) btn.classList.add('show');
+    else btn.classList.remove('show');
+  }
+  window.addEventListener('scroll', function(){
+    if (!raf) raf = requestAnimationFrame(update);
+  }, { passive: true });
+  btn.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+
+/* ─── Floating quick-tools menu (FAB) ─────────────────────────────── */
+(function(){
+  const main = document.getElementById('fab-main');
+  const menu = document.getElementById('fab-menu');
+  if (!main || !menu) return;
+  function close(){
+    menu.classList.remove('open');
+    main.setAttribute('aria-expanded', 'false');
+  }
+  function toggle(){
+    const open = menu.classList.toggle('open');
+    main.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  main.addEventListener('click', function(e){ e.stopPropagation(); toggle(); });
+  document.addEventListener('click', function(e){
+    if (!menu.classList.contains('open')) return;
+    if (e.target.closest('.fab-wrap')) return;
+    close();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && menu.classList.contains('open')) close();
+    /* T key opens the menu when not typing */
+    if (e.key === 't' || e.key === 'T'){
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      toggle();
+    }
+  });
+  const ACTIONS = {
+    'search': function(){ const b = document.getElementById('open-search'); if (b) b.click(); },
+    'random': function(){ const b = document.getElementById('tool-random'); if (b) b.click(); },
+    'flashcards': function(){ const b = document.getElementById('tool-flashcards'); if (b) b.click(); },
+    'essay-gen': function(){ const b = document.getElementById('tool-essay-gen'); if (b) b.click(); },
+    'timed': function(){ const b = document.getElementById('tool-timed'); if (b) b.click(); },
+    'quiz': function(){ const b = document.getElementById('tool-quiz'); if (b) b.click(); },
+    'past-papers': function(){ const b = document.getElementById('tool-past-papers'); if (b) b.click(); }
+  };
+  menu.querySelectorAll('.fab-item').forEach(function(item){
+    item.addEventListener('click', function(){
+      const key = item.dataset.fab;
+      close();
+      const fn = ACTIONS[key];
+      if (fn) fn();
+    });
+  });
+})();
